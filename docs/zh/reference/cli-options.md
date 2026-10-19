@@ -40,14 +40,14 @@
 | `--payment-date-repair` | `False` | 仅 corporate_actions：先应用已审发行人公告，再用 Baostock 匹配真实派息日；早于除息日的付款日视为未知。 |
 | `--issuer-notice-repair` | `False` | 仅 corporate_actions：只用发行人实施公告（已审清单、巨潮、北交所）修复付款日和已审送转条款；未匹配事件保留缺口，不请求 Baostock。 |
 | `--baostock-repair` | `False` | 仅 corporate_actions：用 Baostock 显式修复已退市的沪深标的。 |
-| `--ths-repair` | `False` | 仅 corporate_actions，历史迁移用：用同花顺补已退市北交所标的的历史分红除权。 |
-| `--eastmoney-bj-repair` | `False` | 仅 corporate_actions，历史迁移用：通过现行的 920xxx 东财代码补北交所老代码的历史分红除权。 |
+| `--ths-repair` | `False` | 仅 corporate_actions：显式用同花顺历史分红除权补已退市的北交所标的。 |
+| `--eastmoney-bj-repair` | `False` | 已弃用，将在 0.20.0 移除：仅 corporate_actions，用于仍以北交所老代码存储的湖：通过现行的 920xxx 东财代码补这些老代码的历史分红除权。 |
 | `--eastmoney-date-repair` | `False` | 仅 corporate_actions：按 --ex-dates 指定的除权日向东财逐日要历史除权行。回补路径的主源是 TDX，东财只有日更的等值过滤能取到 2015-09-29 以前的行。 |
 | `--ex-dates` | `—` | 配合 --eastmoney-date-repair：逗号分隔的除权日 YYYY-MM-DD。 |
-| `--bse-tip-repair` | `False` | 仅 daily_bars，历史迁移用：用北交所官网补已有当期交易日的 BJ 成交额，不重抓 Sina。日更已以北交所行情板为 BJ 当期主源。 |
-| `--bj-amount-repair` | `False` | 仅 daily_bars，已由 --tdx-amount-repair 取代：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。 |
+| `--bse-tip-repair` | `False` | 仅 daily_bars：用北交所行情板补湖中已有当期交易日的 BJ 成交额，不重抓 Sina，例如日更时行情板不可用。行情板只提供当前快照，因此只适用于最近一个交易日。 |
+| `--bj-amount-repair` | `False` | 已弃用，将在 0.20.0 移除，请改用 --tdx-amount-repair：仅 daily_bars：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。 |
 | `--tdx-amount-repair` | `False` | 仅 daily_bars：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。已存的价格和成交量一律不动。需要 --start/--end。 |
-| `--tdx-volume-repair` | `False` | 仅 daily_bars：重读 TDX，只改写已存 TDX 行的成交量（修 2026-09-17 前的解码错误）；价格须一致，64.5 元以下被放大的成交额一并改写；不新增行。需要 --symbols 和 --start/--end。 |
+| `--tdx-volume-repair` | `False` | 已弃用，将在 0.20.0 移除：仅 daily_bars：重读 TDX，只改写已存 TDX 行的成交量（修 2026-09-17 前的解码错误）；价格须一致，64.5 元以下被放大的成交额一并改写；不新增行。需要 --symbols 和 --start/--end。 |
 | `--turnover-repair` | `False` | 仅 daily_bars：成交额缺失、为 0 或量额单位错位的沪深股票行，用 Baostock 同日行整行替换；开高低收须在半分钱内一致，不一致或未提供的保留原值。需要 --start/--end。 |
 | `--turnover-peer-review` | `False` | 与 --turnover-repair 同用：以交易所历史日线、通达信和东财复查价格冲突，一致证据才整行替换；不拼接交易所汇总量额。 |
 | `--fill-em-outage` | `False` | 仅 valuation_metrics：东财快照中断时，用东财 datacenter 估值报表补东财最后一个完整日之后、今天之前的 --start/--end 窗口；全市场取全才写入。 |
@@ -162,8 +162,8 @@
 | `--profile` | `quick` | 建多大。demo = 用真实数据源抓几只票，sample = 同样的形状但离线且确定 —— 两者都不是一个市场。quick = 全市场标的、最近 3 年；full = 全市场标的、从 2016-01-01 起（通常需要更多分页）。以后可以用 `cne backfill daily_bars` 补深。 |
 | `--symbols` | `600519.SH,000001.SZ,000858.SZ,300750.SZ,601318.SH` | demo/sample：要抓的标的，逗号分隔（有意保持很少）。 |
 | `--days` | `30` | demo/sample：daily_bars 大致抓最近多少个交易日。 |
-| `--data-root` | `data/cnequity-demo` | demo/sample：独立的湖根目录（不要拿去跑全市场 init）。 |
-| `--config-out` | `configs/cnequity.demo.toml` | demo/sample：把那份小配置写到哪，供后续 `cne query` 使用。 |
+| `--data-root` | `data/cnequity-demo; sample: data/cnequity-sample` | demo/sample：独立的湖根目录（不要拿去跑全市场 init）。 |
+| `--config-out` | `configs/cnequity.demo.toml; sample: configs/cnequity.sample.toml` | demo/sample：把那份小配置写到哪，供后续 `cne query` 使用。 |
 | `--force` | `False` | demo/sample：允许覆盖内容不同的已有 --config-out；默认拒绝并保留原文件。 |
 | `--intraday` | `False` | demo/sample：同一批标的额外抓 1 分钟线（最多 5 个交易日）并打印一个交易日，让 bar_time 的口径看得见。 |
 | `--research` | `False` | demo/sample：额外用 Sina 派生 hfq 复权因子，并打印未复权 / 复权收益对照（较慢；需要访问 Sina）。 |
@@ -208,7 +208,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `--sql` | `SELECT COUNT(*) AS n FROM daily_bars` | — |
+| `--sql` | `SELECT COUNT(*) AS n FROM daily_bars` | 只读 DuckDB SQL；每个数据集是一个视图，名称同 `cne status --datasets`。 |
 | `--dataset` | `—` | 按需抓取的数据集名 |
 | `--symbol` | `—` | 按需抓取的标的代码 |
 | `--refresh` | `False` | 抓取前先刷新按需缓存（需要同时给 --dataset 和 --symbol）。 |
@@ -629,52 +629,6 @@
 | `--phase` | `mark` | mark 原地标记；purge 已禁用，请转到 serve 存储运维页。 |
 | `--maintenance-window` | `False` | 兼容选项；不能绕过网页删除确认。 |
 
-## `cne storage archive`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `object_id` | `—` | 必填；位置参数 |
-| `--destination` | `—` | 必填 |
-
-## `cne storage artifact-verify`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `object_id` | `—` | 必填；位置参数 |
-
-## `cne storage experiment-apply`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `plan_id` | `—` | 必填；位置参数 |
-| `--maintenance-window` | `False` | 兼容选项；不能绕过网页删除确认。 |
-
-## `cne storage experiment-create`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `--parent` | `—` | 必填 |
-| `--case-id` | `—` | 必填 |
-
-## `cne storage experiment-plan`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `--phase` | `mark` | — |
-
-## `cne storage experiment-seal`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `object_id` | `—` | 必填；位置参数 |
-| `--artifact-id` | `—` | 必填 |
-
 ## `cne storage explain`
 
 | 参数 | 默认值 | 说明 |
@@ -712,13 +666,15 @@
 | `--keep` | `5` | — |
 | `--phase` | `mark` | — |
 
-## `cne storage resolve`
+## `cne storage raw-external`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `old_path` | `—` | 必填；位置参数 |
-| `--artifact-id` | `—` | 存在多个封存版本时明确选择一个工件。 |
+| `--dataset` | `—` | 必填 |
+| `--source` | `—` | 必填 |
+| `--root` | `—` | 必填 |
+| `--format` | `pdf` | — |
 
 ## `cne ths-official backfill`
 

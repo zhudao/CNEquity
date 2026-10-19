@@ -150,10 +150,10 @@ msgstr ""
 #, python-brace-format
 msgid ""
 "\n"
-"Found {DEMO_CONFIG}, written by `cne init --profile demo`. To work on the demo lake, add `--config {DEMO_CONFIG}`."
+"Found {config}, written by `cne init --profile {profile}`. To work on that lake, add `--config {config}`."
 msgstr ""
 "\n"
-"找到 `cne init --profile demo` 写的 {DEMO_CONFIG} —— 要对 demo 湖操作，请加上 `--config {DEMO_CONFIG}`。"
+"找到 `cne init --profile {profile}` 写的 {config} —— 要对那个湖操作，请加上 `--config {config}`。"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
@@ -528,12 +528,21 @@ msgstr "  正在重跑全湖审计（读每个历史分区）…"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
+msgid "  Research readiness is not assessed for a {profile} lake"
+msgstr "  {profile} 湖不评估研究就绪度"
+
+#: cnequity/cli/quality_cmds.py
+#, python-brace-format
 msgid "  STALE datasets: {value}"
 msgstr "  STALE 数据集：{value}"
 
 #: cnequity/cli/quality_cmds.py
 msgid "  Sample lake: source=mock is the expected evidence of this offline profile and does not count toward the health gate; it is still not usable for research."
 msgstr "  sample 湖：source=mock 是这个离线 profile 的预期证据，不参与健康门禁；它仍不可用于研究。"
+
+#: cnequity/cli/quality_cmds.py
+msgid "  Sample lake: the data is synthetic, so no quality audit applies"
+msgstr "  sample 湖：数据是合成的，不做质量审计"
 
 #: cnequity/cli/init_summary.py
 msgid "  See which data source is unreachable: cne sources probe"
@@ -606,6 +615,11 @@ msgstr "  findings：{value} error、{value2} warning、{value3} info"
 msgid "  {value} datasets, {value2:,} rows, {value3:.1f} GB (counted at {value4})"
 msgstr "  {value} 个数据集、{value2:,} 行、{value3:.1f} GB（统计于 {value4}）"
 
+#: cnequity/cli/quality_cmds.py
+#, python-brace-format
+msgid "  {value} registered datasets hold no data, as expected for a {profile} lake"
+msgstr "  {value} 个已注册数据集没有数据，符合 {profile} 湖的预期"
+
 #: cnequity/orchestrator/worker_pool.py
 #, python-format
 msgid " (%d/%d symbols failed)"
@@ -659,6 +673,11 @@ msgstr " [仅显式探测]"
 #, python-brace-format
 msgid " and others ({total} in all)"
 msgstr " 等 {total} 个"
+
+#: cnequity/cli/_shared.py
+#, python-brace-format
+msgid " at line {line}, column {column}"
+msgstr "，第 {line} 行第 {column} 列"
 
 #: cnequity/progress.py
 #, python-format
@@ -804,6 +823,11 @@ msgstr "%s: 冷却后已有一个恢复探测在进行；本次不发请求。"
 #, python-format
 msgid "%s: aborted"
 msgstr "%s：已中止"
+
+#: cnequity/cli/_root.py
+#, python-format
+msgid "%s: interrupted"
+msgstr "%s：已中断"
 
 #: cnequity/diagnostics/source_health.py
 #, python-format
@@ -1235,10 +1259,6 @@ msgstr "回环地址会同时监听 127.0.0.1 和 localhost。非回环地址必
 msgid "A manual selection can only be used for a new deletion, not together with marked or restore records."
 msgstr "手动选择只能用于新的删除，不能和标记或恢复记录一起用。"
 
-#: cnequity/storage/lifecycle/experiments.py
-msgid "A manual selection can only be used for deletion, without duplicates."
-msgstr "手动选择只能用于删除，且不能重复。"
-
 #: cnequity/storage/lifecycle/__init__.py
 msgid "A manual selection can only be used for deletion."
 msgstr "手动选择只能用于删除。"
@@ -1258,6 +1278,10 @@ msgstr "定时日更或收尾补抓正在运行。"
 #: cnequity/serve/ops/preflight.py
 msgid "A scheduled event stream is running."
 msgstr "定时事件流正在运行。"
+
+#: cnequity/orchestrator/recovery.py
+msgid "A snapshot source cannot recreate missed history; a retry only obtains the observations the source can still offer."
+msgstr "快照源不能补造错过的历史；重试只取得来源仍可提供的观察。"
 
 #: cnequity/research/packs.py
 msgid "A snapshot such as trading status that misses a day cannot be filled by the next dated daily update; the closing catch-up tries again that same day. Announcements and news are not part of the research-pack daily update; run `cne run events` separately when needed."
@@ -1676,11 +1700,6 @@ msgstr ""
 "连不上 TDX：{exc}\n"
 "建议：换大陆网络 / VPN 出口再试，或者检查示例配置里的 `[tdx_protocol.hosts]`。"
 
-#: cnequity/storage/lifecycle/experiments.py
-#, python-brace-format
-msgid "Cannot delete experiment {oid}: it is still in use, referenced or retained, or has no verifiable archive yet."
-msgstr "不能删除试验 {oid}：仍在使用、被引用、被保留，或还没有可核对的归档。"
-
 #: cnequity/storage/lifecycle/purge.py
 #, python-brace-format
 msgid "Cannot delete {oid}: it is the current version, or is still referenced or retained, or has no receipt."
@@ -1926,10 +1945,6 @@ msgstr "某阶段失败后继续"
 msgid "Contract check passed"
 msgstr "契约检查通过"
 
-#: cnequity/cli/storage_cmds.py
-msgid "Copy a registered experiment and verify it file by file; seal the copy, keeping the original directory and its protection."
-msgstr "复制登记试验并逐文件校验；封存副本，保留原目录及其保护。"
-
 #: cnequity/serve/ops/catalog.py
 msgid "Copy the selected datasets into a verifiable lake snapshot. Does not contact data sources."
 msgstr "把明确选择的数据集复制成可校验的湖快照，不请求数据源。"
@@ -1949,8 +1964,8 @@ msgstr "无法生成配置（{name}）。"
 
 #: cnequity/cli/_shared.py
 #, python-brace-format
-msgid "Could not load config {path} ({name}); check the TOML syntax, value types, and that rate limits are finite and non-negative."
-msgstr "无法加载配置 {path}（{name}）；请检查 TOML 语法、数值类型和非负有限限速。"
+msgid "Could not load config {path} ({name}{where}); check the TOML syntax, value types, and that rate limits are finite and non-negative."
+msgstr "无法加载配置 {path}（{name}{where}）；请检查 TOML 语法、数值类型和非负有限限速。"
 
 #: cnequity/serve/ops/job.py
 #, python-brace-format
@@ -1994,10 +2009,6 @@ msgstr "覆盖窗口终点；--bars 默认上一个完整交易日，--derivativ
 #: cnequity/cli/govern_cmds.py
 msgid "Create NAME as an immutable add/replace/delete package."
 msgstr "把 NAME 创建成一个不可变的 增加/替换/删除 包。"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Create an empty experiment directory with its own instance identity, and register it as active."
-msgstr "创建有独立实例身份的空试验目录，并登记为 active。"
 
 #: cnequity/serve/ops/catalog.py
 msgid "Create data backup"
@@ -2220,6 +2231,26 @@ msgstr "demo 窗口：{value} → {value2}（目标 {window_days} 个交易日�
 #: cnequity/diagnostics/render.py
 msgid "Dependencies"
 msgstr "依赖"
+
+#: cnequity/cli/maintain_cmds.py
+msgid "Deprecated targets: bse_code_migration and valuation_orphans only migrate lakes written by cnequity 0.17 or earlier and will be removed in 0.20.0; a valuation_metrics backfill already drops orphan valuation rows."
+msgstr "已弃用的目标：bse_code_migration 和 valuation_orphans 只用于迁移 cnequity 0.17 及更早版本写入的湖，将在 0.20.0 移除；valuation_metrics 回填时已会自动清理孤立的估值行。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "Deprecated, removed in 0.20.0: corporate_actions only, for lakes that still store old BSE codes: fill their historical dividends and ex-rights via the current 920xxx EastMoney codes."
+msgstr "已弃用，将在 0.20.0 移除：仅 corporate_actions，用于仍以北交所老代码存储的湖：通过现行的 920xxx 东财代码补这些老代码的历史分红除权。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "Deprecated, removed in 0.20.0: daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
+msgstr "已弃用，将在 0.20.0 移除：仅 daily_bars：重读 TDX，只改写已存 TDX 行的成交量（修 2026-09-17 前的解码错误）；价格须一致，64.5 元以下被放大的成交额一并改写；不新增行。需要 --symbols 和 --start/--end。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "Deprecated, removed in 0.20.0; use --tdx-amount-repair: daily_bars only: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
+msgstr "已弃用，将在 0.20.0 移除，请改用 --tdx-amount-repair：仅 daily_bars：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。"
+
+#: cnequity/cli/repair_cmds.py
+msgid "Deprecated: a one-time migration for lakes written by cnequity 0.17 or earlier; current versions no longer write this defect. It will be removed in 0.20.0."
+msgstr "已弃用：仅用于迁移 cnequity 0.17 及更早版本写入的湖，当前版本已不再写出这类问题。将在 0.20.0 移除。"
 
 #: cnequity/serve/ops/catalog.py
 msgid "Depth"
@@ -2460,14 +2491,6 @@ msgstr "显式指定历史起点（YYYY-MM-DD）；覆盖 --profile。"
 msgid "Explicitly accept that the annual package lacks fields found only in the daily files; existing complete daily bars are not overwritten."
 msgstr "明确接受年度包缺少日文件独有字段；已有完整日线不会被覆盖。"
 
-#: cnequity/cli/storage_cmds.py
-msgid "Explicitly end an experiment working directory, and bind its sealed state to the verified archive."
-msgstr "显式结束试验工作目录，并将封存状态绑定到已验证的归档。"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Explicitly select one artifact when several sealed versions exist."
-msgstr "存在多个封存版本时明确选择一个工件。"
-
 #: cnequity/cli/decision_data_cmds.py
 msgid "Export reviewed holder-specific rights tied to the current action revision."
 msgstr "导出已审核的、与当前公司行为修订版本绑定的持有人专属权益。"
@@ -2631,8 +2654,8 @@ msgid "Finish the first-time setup first."
 msgstr "先完成首次配置。"
 
 #: cnequity/serve/storage.py
-msgid "First confirm that external queries, services, schedules and experiment writes have stopped."
-msgstr "请先确认外部查询、服务、调度和试验写入已停止。"
+msgid "First confirm that external queries, services and schedules have stopped."
+msgstr "请先确认外部查询、服务和调度已停止。"
 
 #: cnequity/serve/ops/scheduler.py
 msgid "First confirm the scope the scheduled tasks will run."
@@ -2734,10 +2757,6 @@ msgstr "仅期货/期权日线：从已核验格式的本地上期所年度 ZIP 
 #: cnequity/diagnostics/source_health.py
 msgid "GFEX website (per-contract daily quotes)"
 msgstr "广期所官网（逐合约日行情）"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Generate a retirement plan for an experiment's original directory that has no references, is not active, and already has a complete archive."
-msgstr "为无引用、非 active 且已有完整归档的试验原目录生成退出计划。"
 
 #: cnequity/serve/ops/settings.py
 msgid "Generate the config before changing fetch settings."
@@ -3070,6 +3089,11 @@ msgstr "Instruments（demo 标的范围）"
 msgid "Interrupted"
 msgstr "已中断"
 
+#: cnequity/orchestrator/worker_pool.py
+#, python-format
+msgid "Interrupted: letting %d %s batch(es) already in flight finish so nothing is half-written; this can take up to one batch's time."
+msgstr "已中断：正在等 %d 个已发出的 %s 批次完成，避免写入一半；最多需要一个批次的时间。"
+
 #: cnequity/serve/ops/catalog.py
 msgid "Invalid backup directory path."
 msgstr "备份目录路径无效。"
@@ -3110,6 +3134,14 @@ msgstr "版本编号无效。"
 #: cnequity/cli/setup_cmds.py
 msgid "Keep going after a stage fails instead of stopping."
 msgstr "某个阶段失败后继续往下跑，而不是停下来。"
+
+#: cnequity/orchestrator/recovery.py
+msgid "Keep the existing lake and deliver the data that passed verification; the gaps stay in the coverage record and can be backfilled later."
+msgstr "保留已有湖，交付本次通过校验的数据；缺口留在覆盖记录中，可稍后补数。"
+
+#: cnequity/orchestrator/recovery.py
+msgid "Keep the existing snapshot; add this dataset to the daily configuration so it accumulates from later collections."
+msgstr "保留已有快照；将该数据集加入日更配置，从后续采集开始积累。"
 
 #: cnequity/cli/maintain_cmds.py
 msgid "Keep the latest this many generations plus current/hold per dataset; other versions are only listed as candidates, not marked, and no bytes are freed. Import a reference manifest before marking in the web UI. 0 skips version handling."
@@ -3172,8 +3204,8 @@ msgid "List the steps and schedule groups this version would add to the config. 
 msgstr "列出当前版本要补进配置的 step 和调度组，不写文件。"
 
 #: cnequity/cli/storage_cmds.py
-msgid "List versions, retention reasons and registered experiments, read-only."
-msgstr "只读列出版本、保留原因和已登记试验。"
+msgid "List versions and their retention reasons, read-only."
+msgstr "只读列出版本及其保留原因。"
 
 #: cnequity/cli/consume_cmds.py
 msgid "Listen address for --http. A non-loopback address requires --token."
@@ -3204,10 +3236,6 @@ msgstr "宏观"
 #: cnequity/serve/storage.py
 msgid "Maintenance is running; follow its progress in the operation records."
 msgstr "维护正在执行，请通过操作记录查看进度。"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Mark a redundant original directory in place; the CLI does not allow physical deletion, which must be confirmed on the serve web page."
-msgstr "原地标记冗余原目录；CLI 不允许物理删除，须到 serve 网页确认。"
 
 #: cnequity/cli/storage_cmds.py
 msgid "Mark after reviewing the plan; the CLI does not allow physical deletion."
@@ -3335,6 +3363,10 @@ msgstr "没有可从面板回填的数据集。"
 msgid "No datasets lag as of {value}"
 msgstr "截至 {value} 没有落后的数据集"
 
+#: cnequity/diagnostics/substitutes.py
+msgid "No endpoint was probed (every source was skipped), so nothing can be compared."
+msgstr "没有探测任何端点（所有来源都被跳过），无法比较。"
+
 #: cnequity/cli/demo.py
 msgid "No exact adjustment example is available in this window; the research example was skipped, and the fetched daily bars stay readable."
 msgstr "当前窗口没有可用的精确复权样例；研究样例已跳过，已获取的日线继续可读。"
@@ -3351,11 +3383,6 @@ msgstr "没有致命问题，{warnings} 个警告。"
 #: cnequity/diagnostics/source_health.py
 msgid "No futures daily quote file was fetched for either of the last two weekdays"
 msgstr "最近两个工作日都没有取到期货日行情文件"
-
-#: cnequity/cli/maintain_cmds.py
-#, python-brace-format
-msgid "No parquet yet: {value}"
-msgstr "还没有 parquet：{value}"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
@@ -3424,10 +3451,6 @@ msgstr "本次未探测（配置关闭、--only 排除，或高成本端点需�
 #: cnequity/diagnostics/source_health.py
 msgid "Not the same host as Sina daily bars, but shares the same per-account 456 quota."
 msgstr "与 sina 日线不是同一台主机，但共用同一个按账号计的 456 配额。"
-
-#: cnequity/cli/backfill_cmds.py
-msgid "Note: --bj-amount-repair has been replaced by --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
-msgstr "提示：--bj-amount-repair 已由 --tdx-amount-repair 取代，后者按开高低收与成交量核对后才补成交额，并覆盖沪深北。"
 
 #: cnequity/cli/run_cmds.py
 #, python-brace-format
@@ -3723,10 +3746,6 @@ msgid "Per-partition detail for one dataset."
 msgstr "某一个数据集的逐分区明细。"
 
 #: cnequity/cli/storage_cmds.py
-msgid "Physical deletion must be reviewed and confirmed on the storage operations page of cne serve."
-msgstr "物理删除必须在 cne serve 的存储运维网页中检查并确认。"
-
-#: cnequity/cli/storage_cmds.py
 msgid "Physical deletion must be reviewed and confirmed on the storage operations page of cne serve; the CLI only allows previewing and marking."
 msgstr "物理删除必须在 cne serve 的存储运维网页中检查并确认；CLI 只允许预览和标记。"
 
@@ -3765,7 +3784,7 @@ msgid ""
 "\"Cleanable\" means: the run is in a terminal state (success/warning/degraded/failed), every batch has settled,\n"
 "and a successful compact has been recorded. Staging that did not finish or was never compacted stays for a retry;\n"
 "--force only widens the preview. Source snapshots and logs are preview-only too, with bytes_freed 0 throughout.\n"
-"Old versions, registered experiments, and staging that merged successfully with no unfinished batches can be deleted after confirming on the serve storage page.\n"
+"Old versions and staging that merged successfully with no unfinished batches can be deleted after confirming on the serve storage page.\n"
 "Orphaned staging, source snapshots and logs are only reported for now."
 msgstr ""
 "预览过期数据，不执行物理删除；删除须在 serve 运维网页确认。\n"
@@ -3774,7 +3793,7 @@ msgstr ""
 "「可清理」是指：run 处于终态（success/warning/degraded/failed）、所有批次都已落定，\n"
 "并且记录过一次成功的 compact。没跑完或从没 compact 过的 staging 会留着等重试，\n"
 "--force 只扩大预览范围。来源快照和日志也仅预览，全部 bytes_freed 为 0。\n"
-"历史版本、登记试验和已成功合并且无未完成批次的 staging 可在 serve 存储运维页确认删除。\n"
+"历史版本和已成功合并且无未完成批次的 staging 可在 serve 存储运维页确认删除。\n"
 "orphan 暂存、来源快照和日志暂仅报告。"
 
 #: cnequity/cli/maintain_cmds.py
@@ -3992,6 +4011,10 @@ msgstr ""
 "重建名录本身 —— 代码空间扫描、终态对账、instruments 修复和覆盖门禁 ——\n"
 "是一次性的工程而不是日常运维，放在 `scripts/delisted_ops.py` 里。"
 
+#: cnequity/cli/consume_cmds.py
+msgid "Read-only DuckDB SQL; each dataset is a view named as in `cne status --datasets`."
+msgstr "只读 DuckDB SQL；每个数据集是一个视图，名称同 `cne status --datasets`。"
+
 #: cnequity/cli/quality_cmds.py
 msgid "Read-only acceptance check of a derivatives research window; requires --dataset, --start, --end."
 msgstr "只读验收衍生品研究窗口；需 --dataset、--start、--end。"
@@ -4090,6 +4113,10 @@ msgstr "只重抓仍然落后于最后交易日的数据集。挂在主 pipeline
 #: cnequity/cli/consume_cmds.py
 msgid "Refresh the on-demand cache before fetching (requires both --dataset and --symbol)."
 msgstr "抓取前先刷新按需缓存（需要同时给 --dataset 和 --symbol）。"
+
+#: cnequity/cli/storage_cmds.py
+msgid "Register external payload storage; retains local sidecars and moves/deletes no files."
+msgstr "登记外置原文存储；本地保留来源记录，不移动或删除文件。"
 
 #: cnequity/serve/ops/records.py
 msgid "Rejected"
@@ -4278,8 +4305,8 @@ msgid "Resuming init run %s"
 msgstr "续跑初始化 run %s"
 
 #: cnequity/cli/storage_cmds.py
-msgid "Retain a version, experiment, artifact or existing cleanup resource, and cancel its pending-deletion mark."
-msgstr "保留版本、试验、工件或已存在的清理资源，并取消待删除标记。"
+msgid "Retain a version or an existing cleanup resource, and cancel its pending-deletion mark."
+msgstr "保留版本或已存在的清理资源，并取消待删除标记。"
 
 #: cnequity/cli/repair_cmds.py
 msgid "Retire BSE session debts and proven pre-listing debts using committed data; preview by default."
@@ -4312,6 +4339,10 @@ msgstr "每个日更调度组最近一次失败的 run 各重试一次。"
 #: cnequity/cli/run_cmds.py
 msgid "Retry the most recent failed run of each daily schedule group."
 msgstr "重试每个 daily 调度组最近一次失败的 run。"
+
+#: cnequity/orchestrator/recovery.py
+msgid "Retry with the original range; ranges beyond the source's capability stay as gaps."
+msgstr "按原请求范围重试；来源能力不足的范围继续保留为缺口。"
 
 #: cnequity/cli/run_cmds.py
 #, python-brace-format
@@ -4475,6 +4506,16 @@ msgstr "用 backfill 语义跑：跳过交易日门禁和每个 step 自己的�
 #, python-brace-format
 msgid "Run without --core-only, or run a schedule group instead: `cne run daily --group <name>` (available: {groups})."
 msgstr "不带 --core-only 运行，或改跑调度组：`cne run daily --group <名字>`（有 {groups}）。"
+
+#: cnequity/cli/run_cmds.py
+#, python-brace-format
+msgid "Run {run_id} ({job_name}) already succeeded; nothing to retry."
+msgstr "运行 {run_id}（{job_name}）已成功，无需重试。"
+
+#: cnequity/cli/quality_cmds.py
+#, python-brace-format
+msgid "Run {run_id} ({job_name}): {status}"
+msgstr "运行 {run_id}（{job_name}）：{status}"
 
 #: cnequity/serve/ops/catalog.py
 #, python-brace-format
@@ -4858,6 +4899,14 @@ msgstr "调度组缺少的 step —— 不带参数的 `cne run daily` 不会跑
 #, python-brace-format
 msgid "Still missing: {datasets}"
 msgstr "还缺：{datasets}"
+
+#: cnequity/cli/_root.py
+msgid "Stopped. Finished batches are kept and the run is recorded as interrupted; run the same command again to continue, and `cne status` shows what it finished."
+msgstr "已停止。完成的批次会保留，本次运行记为中断；再运行同一条命令即可继续，`cne status` 可查看已完成的部分。"
+
+#: cnequity/cli/_root.py
+msgid "Stopped. Run `cne init` again to resume; finished batches are kept."
+msgstr "已停止。再次运行 `cne init` 即可续跑，完成的批次会保留。"
 
 #: cnequity/serve/ops/scheduler.py
 msgid "Stops future scheduled triggers; tasks already running continue."
@@ -5243,10 +5292,6 @@ msgstr "事件流设置或运行间隔已变化，没有重复取数。"
 msgid "The exchange's official definition, on a different risk-control surface from EastMoney; usable as a backup source."
 msgstr "交易所官方口径，与东财不同风控面，可作备源。"
 
-#: cnequity/serve/storage.py
-msgid "The experiment cleanup plan has changed."
-msgstr "试验清理计划已改变。"
-
 #: cnequity/diagnostics/report.py
 msgid "The first `cne init` creates it."
 msgstr "首次 `cne init` 会创建它。"
@@ -5548,6 +5593,11 @@ msgstr "还没到今天的日更时间 {daily_run_at}（北京时间），当天
 msgid "Today's daily update time {daily_run_at} (Beijing time) has not come yet, and today's data may not be published. This run will not count as the scheduled one, and the scheduled daily update still runs on time."
 msgstr "还没到今天的日更时间 {daily_run_at}（北京时间），当天数据可能还没发布。这次不会记成定时任务已跑，到点后定时日更仍会运行。"
 
+#: cnequity/cli/run_cmds.py
+#, python-brace-format
+msgid "Today's session ({today}) is not final until 15:05 Beijing time; the schedule groups update through {settled}."
+msgstr "今天（{today}）的交易日要到北京时间 15:05 才收盘定稿；本次各调度组只更新到 {settled}。"
+
 #: cnequity/serve/storage.py
 msgid "Too many check requests; try again shortly."
 msgstr "检查请求过多，请稍后重试。"
@@ -5765,10 +5815,6 @@ msgstr "校验 @ {value} —— {value2} 个缺口"
 msgid "Verify ARCHIVE and import it into the snapshot store atomically."
 msgstr "校验 ARCHIVE 并原子地导入快照库。"
 
-#: cnequity/cli/storage_cmds.py
-msgid "Verify and resolve the archived location of an old path; does not rewrite reports or create symlinks."
-msgstr "校验并解析旧路径的归档位置；不改写报告，不创建符号链接。"
-
 #: cnequity/serve/ops/catalog.py
 msgid "Verify coverage"
 msgstr "校验覆盖"
@@ -5776,10 +5822,6 @@ msgstr "校验覆盖"
 #: cnequity/serve/ops/catalog.py
 msgid "Verify data backup"
 msgstr "校验数据备份"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Verify the full contents of an archived artifact against its sealed manifest."
-msgstr "按封存清单校验归档工件的完整内容。"
 
 #: cnequity/cli/govern_cmds.py
 msgid "Verify the hashes and change semantics of every add/replace payload."
@@ -5813,10 +5855,19 @@ msgstr "查看带版本的研究 universe profile。"
 msgid "Warning: "
 msgstr "警告："
 
+#: cnequity/cli/backfill_cmds.py
+msgid "Warning: --bj-amount-repair is deprecated and will be removed in 0.20.0; use --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
+msgstr "警告：--bj-amount-repair 已弃用，将在 0.20.0 移除；请改用 --tdx-amount-repair，后者按开高低收与成交量核对后才补成交额，并覆盖沪深北。"
+
 #: cnequity/cli/demo.py
 #, python-brace-format
 msgid "Warning: Sina returned no adjustment factors for: {value}"
 msgstr "警告：Sina 没有返回这些的复权因子：{value}"
+
+#: cnequity/cli/_shared.py
+#, python-brace-format
+msgid "Warning: `{command}` is deprecated and will be removed in 0.20.0; it only migrates lakes written by cnequity 0.17 or earlier."
+msgstr "警告：`{command}` 已弃用，将在 0.20.0 移除；它只用于迁移 cnequity 0.17 及更早版本写入的湖。"
 
 #: cnequity/cli/ths_official_cmds.py
 msgid "Warning: applying without --adjudicator switches every disputed row, including the ones an independent source would judge wrong"
@@ -6019,6 +6070,10 @@ msgstr "XLSX 解析"
 msgid "XLS·XLSX parsing of SW / CNI constituent history"
 msgstr "申万 / 国证成分历史的 XLS·XLSX 解析"
 
+#: cnequity/cli/repair_cmds.py
+msgid "[deprecated] "
+msgstr "[已弃用] "
+
 #: cnequity/cli/backfill_cmds.py
 #, python-brace-format
 msgid "[{dataset}] owes {value} keys across {value2} symbols; repairing in {value3} monthly batches"
@@ -6038,6 +6093,11 @@ msgstr "[{dataset}] 标的 {value}..{value2}/{value3}（{value4}..{value5}）窗
 #, python-brace-format
 msgid "[{dataset}] this run's scope is overridden to {value} symbols"
 msgstr "[{dataset}] 本次 run 的范围被覆盖为 {value} 只标的"
+
+#: cnequity/cli/backfill_cmds.py
+#, python-brace-format
+msgid "[{dataset}] watermark moved back from {before} to {after}: sessions after {after} are not all in the lake, so it reads STALE until they are. The next daily run fills them, or now: `cne backfill {dataset} --start {start}`"
+msgstr "[{dataset}] 水位线从 {before} 回退到 {after}：{after} 之后的交易日尚未全部入湖，补齐前状态显示 STALE。下一次日常更新会补齐，也可现在运行：`cne backfill {dataset} --start {start}`"
 
 #: cnequity/cli/backfill_cmds.py
 #, python-brace-format
@@ -6131,16 +6191,12 @@ msgid "corporate actions"
 msgstr "公司行为"
 
 #: cnequity/cli/backfill_cmds.py
-msgid "corporate_actions only, for historical migration: fill historical dividends and ex-rights of delisted BSE symbols from THS."
-msgstr "仅 corporate_actions，历史迁移用：用同花顺补已退市北交所标的的历史分红除权。"
-
-#: cnequity/cli/backfill_cmds.py
-msgid "corporate_actions only, for historical migration: fill historical dividends and ex-rights of old BSE codes via the current 920xxx EastMoney codes."
-msgstr "仅 corporate_actions，历史迁移用：通过现行的 920xxx 东财代码补北交所老代码的历史分红除权。"
-
-#: cnequity/cli/backfill_cmds.py
 msgid "corporate_actions only: apply reviewed issuer announcements first, then match actual payment dates with Baostock; payment dates earlier than the ex-date are treated as unknown."
 msgstr "仅 corporate_actions：先应用已审发行人公告，再用 Baostock 匹配真实派息日；早于除息日的付款日视为未知。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "corporate_actions only: explicitly repair delisted Beijing symbols with THS historical dividends and ex-rights."
+msgstr "仅 corporate_actions：显式用同花顺历史分红除权补已退市的北交所标的。"
 
 #: cnequity/cli/backfill_cmds.py
 msgid "corporate_actions only: explicitly repair delisted Shanghai and Shenzhen symbols with Baostock."
@@ -6183,20 +6239,12 @@ msgstr ""
 "解决之后重跑 `cne init --profile demo`。"
 
 #: cnequity/cli/backfill_cmds.py
-msgid "daily_bars only, for historical migration: fill BJ turnover for existing current-period trading days from the BSE website without refetching Sina. Daily updates already use the BSE quote board as the primary current-period source for BJ."
-msgstr "仅 daily_bars，历史迁移用：用北交所官网补已有当期交易日的 BJ 成交额，不重抓 Sina。日更已以北交所行情板为 BJ 当期主源。"
-
-#: cnequity/cli/backfill_cmds.py
-msgid "daily_bars only, superseded by --tdx-amount-repair: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
-msgstr "仅 daily_bars，已由 --tdx-amount-repair 取代：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。"
-
-#: cnequity/cli/backfill_cmds.py
 msgid "daily_bars only: cross-check historical Shanghai, Shenzhen and Beijing rows filled from Sina against TDX, filling turnover only when OHLC match and the volume difference is under one lot; codes TDX lacks keep the Sina rows. Stored prices and volumes are never touched. Requires --start/--end."
 msgstr "仅 daily_bars：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。已存的价格和成交量一律不动。需要 --start/--end。"
 
 #: cnequity/cli/backfill_cmds.py
-msgid "daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
-msgstr "仅 daily_bars：重读 TDX，只改写已存 TDX 行的成交量（修 2026-09-17 前的解码错误）；价格须一致，64.5 元以下被放大的成交额一并改写；不新增行。需要 --symbols 和 --start/--end。"
+msgid "daily_bars only: fill BJ turnover for a current-period session already in the lake from the BSE quote board, without refetching Sina, for example when the board was unavailable during the daily update. The board is a current snapshot, so only the latest session qualifies."
+msgstr "仅 daily_bars：用北交所行情板补湖中已有当期交易日的 BJ 成交额，不重抓 Sina，例如日更时行情板不可用。行情板只提供当前快照，因此只适用于最近一个交易日。"
 
 #: cnequity/cli/backfill_cmds.py
 msgid "daily_bars only: replace Shanghai/Shenzhen stock rows whose turnover is missing, zero or has misaligned volume/amount units with the whole same-day Baostock row; OHLC must agree within half a cent, otherwise or if unavailable the original values are kept. Requires --start/--end."
@@ -6674,6 +6722,11 @@ msgstr "{action!r} 不是 {value} 之一"
 
 #: cnequity/cli/run_cmds.py
 #, python-brace-format
+msgid "{config_path} belongs to a {profile} lake, which has no daily schedule: a few symbols are not worth updating. Build a lake `cne run daily` can keep current with `cne init`, which writes configs/cnequity.toml."
+msgstr "{config_path} 是 {profile} 湖的配置，没有日更计划（几只股票不值得更新）。要得到能用 `cne run daily` 保持最新的湖，请运行 `cne init`，它会写入 configs/cnequity.toml。"
+
+#: cnequity/cli/run_cmds.py
+#, python-brace-format
 msgid "{config_path} has no [[job.daily.waves]]: without schedule groups `cne run daily` runs this wave DAG, and this config defines none, so a run would fetch nothing and still report success. {remedy}"
 msgstr "{config_path} 里没有 [[job.daily.waves]]：没有调度组时 `cne run daily` 跑的就是这张 wave DAG，而这份配置一条都没定义，跑起来会一行数据都没抓却报成功。{remedy}"
 
@@ -6681,6 +6734,11 @@ msgstr "{config_path} 里没有 [[job.daily.waves]]：没有调度组时 `cne ru
 #, python-brace-format
 msgid "{config} has no [job.daily.groups]; a config written by `cne config create` has these schedule groups."
 msgstr "{config} 里没有 [job.daily.groups] —— `cne config create` 生成的配置带有这些调度组。"
+
+#: cnequity/cli/demo.py
+#, python-brace-format
+msgid "{data_root} holds the synthetic sample lake (source=mock). Real data is not written over it: pass another --data-root, or delete that directory first."
+msgstr "{data_root} 里是合成的 sample 湖（source=mock），不会把真实数据写进去：请换一个 --data-root，或先删除该目录。"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
@@ -6785,6 +6843,11 @@ msgstr "{name}（{step}）"
 msgid "{note}, {found}"
 msgstr "{note}，{found}"
 
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "{path} belongs to a {profile} lake, which has no schedule to compare or upgrade; `cne init` builds a lake with a full config."
+msgstr "{path} 是 {profile} 湖的配置，没有可比较或升级的调度；`cne init` 会建立带完整配置的湖。"
+
 #: cnequity/config/drift.py
 #, python-brace-format
 msgid "{path} matches the packaged example config."
@@ -6855,6 +6918,11 @@ msgstr "{value} 需要是开关。"
 msgid "{value} only applies with --http"
 msgstr "{value} 只用于 --http"
 
+#: cnequity/cli/maintain_cmds.py
+#, python-brace-format
+msgid "{value} registered datasets have no parquet yet (see `cne status --datasets`)"
+msgstr "{value} 个已注册数据集还没有 parquet（见 `cne status --datasets`）"
+
 #: cnequity/config/drift.py
 msgid "→ Run `cne config upgrade` to add the missing steps and schedule groups (it backs up the config first)."
 msgstr "→ 运行 `cne config upgrade` 自动补上缺少的 step 和调度组（会先备份原配置）。"
@@ -6866,6 +6934,10 @@ msgstr "✓ 公司行为没有改变任何复权因子输入，无需重算"
 #: cnequity/cli/backfill_cmds.py
 msgid "✓ Daily bars did not change; adjustment factors and suspensions need no recompute"
 msgstr "✓ 日线没有变化，复权因子与停牌无需重算"
+
+#: cnequity/cli/quality_cmds.py
+msgid "✓ Install verified: the offline sample lake reads back correctly (synthetic data, not for research)"
+msgstr "✓ 安装验证通过：离线 sample 湖读取正常（合成数据，不可用于研究）"
 
 #: cnequity/cli/init_summary.py
 #, python-brace-format
@@ -6885,4 +6957,8 @@ msgstr "✓ 湖可用：新鲜度、覆盖和质量都通过"
 #, python-brace-format
 msgid "✗ The lake build has not finished yet (run {run_id}). Everything already downloaded is saved."
 msgstr "✗ 建湖还没完成（run {run_id}）。已下载的部分都已保存。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "✗ This backfill fetched nothing usable, so the range stays a gap in the coverage record. `fallback` above gives the reason (sources unavailable, or unable to serve this range) and the sources tried; the log has the reason for each key."
+msgstr "✗ 本次回填没有取到可用数据，该范围作为缺口留在覆盖记录中。上方 `fallback` 给出了原因（数据源不可用，或无法提供这段范围）和尝试过的来源；日志里有每个键的原因。"
 

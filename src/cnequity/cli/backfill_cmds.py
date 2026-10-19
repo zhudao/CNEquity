@@ -21,9 +21,11 @@ from cnequity.cli._shared import (
     _cfg,
     _run_status_exit_code,
     attach_log_file,
+    comma_option,
     comma_values,
     config_option,
     parse_date_option,
+    warn_deprecated_migration,
 )
 from cnequity.domain.datasets import get_dataset
 from cnequity.domain.market_time import shanghai_today
@@ -134,7 +136,7 @@ from cnequity.orchestrator.engine import JobEngine
         )
     ),
 )
-@click.option(
+@comma_option(
     "--symbols",
     "symbols_str",
     default=None,
@@ -189,14 +191,14 @@ from cnequity.orchestrator.engine import JobEngine
     "--ths-repair",
     is_flag=True,
     help=N_(
-        "corporate_actions only, for historical migration: fill historical dividends and ex-rights of delisted BSE symbols from THS."
+        "corporate_actions only: explicitly repair delisted Beijing symbols with THS historical dividends and ex-rights."
     ),
 )
 @click.option(
     "--eastmoney-bj-repair",
     is_flag=True,
     help=N_(
-        "corporate_actions only, for historical migration: fill historical dividends and ex-rights of old BSE codes via the current 920xxx EastMoney codes."
+        "Deprecated, removed in 0.20.0: corporate_actions only, for lakes that still store old BSE codes: fill their historical dividends and ex-rights via the current 920xxx EastMoney codes."
     ),
 )
 @click.option(
@@ -219,7 +221,7 @@ from cnequity.orchestrator.engine import JobEngine
     is_flag=True,
     help=(
         N_(
-            "daily_bars only, for historical migration: fill BJ turnover for existing current-period trading days from the BSE website without refetching Sina. Daily updates already use the BSE quote board as the primary current-period source for BJ."
+            "daily_bars only: fill BJ turnover for a current-period session already in the lake from the BSE quote board, without refetching Sina, for example when the board was unavailable during the daily update. The board is a current snapshot, so only the latest session qualifies."
         )
     ),
 )
@@ -228,7 +230,7 @@ from cnequity.orchestrator.engine import JobEngine
     is_flag=True,
     help=(
         N_(
-            "daily_bars only, superseded by --tdx-amount-repair: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
+            "Deprecated, removed in 0.20.0; use --tdx-amount-repair: daily_bars only: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
         )
     ),
 )
@@ -246,7 +248,7 @@ from cnequity.orchestrator.engine import JobEngine
     is_flag=True,
     help=(
         N_(
-            "daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
+            "Deprecated, removed in 0.20.0: daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
         )
     ),
 )
@@ -584,10 +586,14 @@ def backfill(
     if bj_amount_repair:
         click.echo(
             _(
-                "Note: --bj-amount-repair has been replaced by --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
+                "Warning: --bj-amount-repair is deprecated and will be removed in 0.20.0; use --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
             ),
             err=True,
         )
+    if eastmoney_bj_repair:
+        warn_deprecated_migration("cne backfill --eastmoney-bj-repair")
+    if tdx_volume_repair:
+        warn_deprecated_migration("cne backfill --tdx-volume-repair")
     if baostock_repair:
         cfg._corporate_actions_baostock_repair = True
     if ths_repair:
@@ -661,6 +667,9 @@ def backfill(
         attach_log_file(cfg, f"backfill-{dataset}")
         result = _repair_outstanding(cfg, dataset, workers)
         click.echo(json.dumps(result, indent=2, default=str))
+        if _fetched_nothing(result):
+            _explain_fetched_nothing()
+            raise SystemExit(1)
         if code := _run_status_exit_code(result["status"]):
             raise SystemExit(code)
         return
@@ -724,6 +733,7 @@ def backfill(
         cfg.st_history_symbols_per_run = 0
 
     spec = get_dataset(dataset)
+    watermark_before = _watermark(cfg, dataset)
     # Explicit lineage: fingerprint the inputs a derive reads before fetching,
     # so the follow-up below derives exactly what this backfill changed.
     actions_before = bars_before = bar_window = None
@@ -751,18 +761,90 @@ def backfill(
         result["followup"] = followup
         if followup.get("status") != "success":
             result["status"] = followup.get("status", "degraded")
-    if actions_before is not None and result.get("status") != "failed":
+    fetched_nothing = _fetched_nothing(result)
+    if actions_before is not None and result.get("status") != "failed" and not fetched_nothing:
         result["adj_factors_sync"] = _follow_lineage(
             result, lambda: _after_corporate_actions(cfg, actions_before, result)
         )
-    if bars_before is not None and result.get("status") != "failed":
+    if bars_before is not None and result.get("status") != "failed" and not fetched_nothing:
         _follow_lineage(result, lambda: _after_daily_bars(cfg, bars_before, bar_window, result))
     if outstanding:
         result["outstanding"] = _settle_outstanding(cfg, dataset)
+    _explain_watermark_pullback(cfg, dataset, watermark_before, result)
     click.echo(json.dumps(result, indent=2, default=str))
+    if fetched_nothing:
+        _explain_fetched_nothing()
+        raise SystemExit(1)
     code = _run_status_exit_code(result["status"])
     if code:
         raise SystemExit(code)
+
+
+def _fetched_nothing(result: dict) -> bool:
+    """A backfill that asked for data and got nothing usable, and wrote nothing.
+
+    The step still reports `degraded`, so a daily run can publish what it has;
+    a backfill exists to fill this range, and having filled none of it is a failure.
+    A `success` is left alone: a step that found nothing new may report no coverage
+    evidence, and that is not a source failure.
+    """
+    return (
+        result.get("status") != "success"
+        and result.get("usable_result") is False
+        and not result.get("rows_written")
+    )
+
+
+def _explain_fetched_nothing() -> None:
+    click.echo(
+        _(
+            "✗ This backfill fetched nothing usable, so the range stays a gap in the coverage "
+            "record. `fallback` above gives the reason (sources unavailable, or unable to serve "
+            "this range) and the sources tried; the log has the reason for each key."
+        ),
+        err=True,
+    )
+
+
+def _watermark(cfg, dataset: str) -> date | None:
+    """Current watermark, or None; this feeds an advisory note and must not fail a backfill."""
+    from cnequity.storage.state import StateStore
+
+    meta_root = getattr(cfg, "meta_root", None)
+    if meta_root is None:
+        return None
+    try:
+        return StateStore(meta_root).get_date(dataset)
+    except (OSError, ValueError):
+        return None
+
+
+def _explain_watermark_pullback(cfg, dataset: str, before: date | None, result: dict) -> None:
+    """Say why a backfill made the dataset read STALE.
+
+    A dense dataset's watermark stops before its first missing session, so an
+    older window that leaves a hole between itself and the existing data pulls
+    the watermark back. That is deliberate — the next run fills the hole — but
+    without a word here `cne status` simply turned STALE after a successful run.
+    """
+    after = _watermark(cfg, dataset)
+    if before is None or after is None or after >= before:
+        return
+    gap_start = after + timedelta(days=1)
+    result["watermark"] = {"before": before.isoformat(), "after": after.isoformat()}
+    click.echo(
+        _(
+            "[{dataset}] watermark moved back from {before} to {after}: sessions after {after} "
+            "are not all in the lake, so it reads STALE until they are. The next daily run "
+            "fills them, or now: `cne backfill {dataset} --start {start}`"
+        ).format(
+            dataset=dataset,
+            before=before.isoformat(),
+            after=after.isoformat(),
+            start=gap_start.isoformat(),
+        ),
+        err=True,
+    )
 
 
 def _follow_lineage(result: dict, derive) -> dict:
@@ -1413,7 +1495,7 @@ def _override_scope(cfg, dataset: str, symbols: list[str]) -> None:
         from cnequity.domain.derivatives import parse_future_code
 
         for symbol in symbols:
-            code, _, exchange = symbol.partition(".")
+            code, _sep, exchange = symbol.partition(".")
             try:
                 contract = parse_future_code(code, exchange, shanghai_today())
             except ValueError as exc:

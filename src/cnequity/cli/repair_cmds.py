@@ -6,8 +6,8 @@ import json
 
 import click
 
-from cnequity.cli._root import cli
-from cnequity.cli._shared import _cfg, config_option
+from cnequity.cli._root import CneCommand, cli
+from cnequity.cli._shared import _cfg, comma_option, config_option, warn_deprecated_migration
 from cnequity.i18n import N_, _
 
 
@@ -15,12 +15,39 @@ def _emit(value: dict) -> None:
     click.echo(json.dumps(value, indent=2, ensure_ascii=False, default=str))
 
 
+class DeprecatedMigration(CneCommand):
+    """A repair that only rewrites what a writer fixed in 0.17 or earlier left behind.
+
+    Ingestion no longer produces these defects, so a lake built or brought up
+    to date by a current version has nothing for them to do. They stay for two
+    minor releases so an older lake can still run them, and are removed in 0.20.0.
+    Click's own `deprecated=` is not used: its label and warning come from
+    Click's catalog, which has no Chinese. The warning goes to stderr so the
+    JSON on stdout stays parseable.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.epilog = N_(
+            "Deprecated: a one-time migration for lakes written by cnequity 0.17 or earlier; "
+            "current versions no longer write this defect. It will be removed in 0.20.0."
+        )
+
+    def get_short_help_str(self, limit: int = 45) -> str:
+        label = _("[deprecated] ")
+        return label + super().get_short_help_str(limit=max(limit - len(label), 10))
+
+    def invoke(self, ctx: click.Context):
+        warn_deprecated_migration(ctx.command_path)
+        return super().invoke(ctx)
+
+
 @cli.group()
 def repair():
     """Repair stored data: previews by default; --apply verifies, publishes, and keeps the old version."""
 
 
-@repair.command("missing-values")
+@repair.command("missing-values", cls=DeprecatedMigration)
 @click.argument("dataset", type=click.Choice(["valuation_metrics", "index_constituents"]))
 @config_option
 @click.option(
@@ -37,7 +64,7 @@ def missing_values(dataset: str, config_path: str, apply: bool):
     _emit(repair_missing_values(_cfg(config_path), dataset, apply=apply))
 
 
-@repair.command("financial-announcements")
+@repair.command("financial-announcements", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -85,7 +112,7 @@ def fund_volume(config_path: str, apply: bool, refresh_sources: bool, max_symbol
 
 @repair.command("financial-originals")
 @config_option
-@click.option("--symbols", help=N_("Comma-separated stock symbols."))
+@comma_option("--symbols", help=N_("Comma-separated stock symbols."))
 @click.option(
     "--all-stocks", is_flag=True, help=N_("Use the lake stock catalogue; choose this or --symbols.")
 )
@@ -163,7 +190,7 @@ def financial_originals(
         raise click.ClickException(str(exc)) from exc
 
 
-@repair.command("daily-bar-coverage")
+@repair.command("daily-bar-coverage", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -214,7 +241,7 @@ def fund_no_print(config_path: str, apply: bool, refresh_sources: bool, max_sess
     )
 
 
-@repair.command("fund-factors")
+@repair.command("fund-factors", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -244,7 +271,7 @@ def fund_factors(config_path: str, apply: bool):
     is_flag=True,
     help=N_("Fetch independent factor evidence; uses local caches only by default."),
 )
-@click.option(
+@comma_option(
     "--symbols",
     default=None,
     help=N_("Comma-separated symbols; checks historical issues in bounded batches by default."),
@@ -293,7 +320,7 @@ def adj_factors(config_path, apply, refresh_sources, symbols, start, end, max_sy
         raise click.ClickException(str(exc)) from exc
 
 
-@repair.command("fund-listing-dates")
+@repair.command("fund-listing-dates", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -311,7 +338,7 @@ def fund_listing_dates(config_path: str, apply: bool):
 
 @repair.command("index-snapshots")
 @config_option
-@click.option(
+@comma_option(
     "--indices",
     default=None,
     help=N_(
@@ -452,7 +479,7 @@ def layout(dataset: str, config_path: str, apply: bool):
         raise click.ClickException(str(exc)) from exc
 
 
-@repair.command("valuation-basis")
+@repair.command("valuation-basis", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -493,10 +520,13 @@ def corporate_action_gaps(config_path: str, apply: bool):
     """
     from cnequity.storage.repairs.corporate_action_gaps import repair_corporate_action_gaps
 
-    _emit(repair_corporate_action_gaps(_cfg(config_path), apply=apply))
+    try:
+        _emit(repair_corporate_action_gaps(_cfg(config_path), apply=apply))
+    except (ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
-@repair.command("orphan-symbols")
+@repair.command("orphan-symbols", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -517,7 +547,7 @@ def orphan_symbols(config_path: str, apply: bool):
     _emit(repair_orphan_symbols(_cfg(config_path), apply=apply))
 
 
-@repair.command("stale-suspensions")
+@repair.command("stale-suspensions", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -537,7 +567,7 @@ def stale_suspensions(config_path: str, apply: bool):
     _emit(repair_stale_derived_suspensions(_cfg(config_path), apply=apply))
 
 
-@repair.command("status-outages")
+@repair.command("status-outages", cls=DeprecatedMigration)
 @config_option
 @click.option("--start", required=True, help=N_("Window start (YYYY-MM-DD)."))
 @click.option("--end", required=True, help=N_("Window end (YYYY-MM-DD)."))
@@ -567,7 +597,7 @@ def status_outages(config_path: str, start: str, end: str, apply: bool):
     _emit(repair_status_outages(_cfg(config_path), start=window[0], end=window[1], apply=apply))
 
 
-@repair.command("status-listing-window")
+@repair.command("status-listing-window", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",
@@ -624,7 +654,7 @@ def status_traded(config_path: str, start, end, apply: bool):
     _emit(repair_status_traded(_cfg(config_path), start=start.date(), end=end.date(), apply=apply))
 
 
-@repair.command("misdated-valuation")
+@repair.command("misdated-valuation", cls=DeprecatedMigration)
 @config_option
 @click.option(
     "--apply",

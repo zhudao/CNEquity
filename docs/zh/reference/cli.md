@@ -121,10 +121,10 @@ Error: `cne retry` 已改名，请改用 `cne run retry`。
 | `--days` | 约多少个交易日的 `daily_bars`（默认 30） |
 | `--intraday` | 额外抓同一批标的的 1m 线（最多约 5 个交易日），打印一根完整会话 |
 | `--research` | 额外从 Sina 派生 hfq 因子，并打印 raw / hfq 收益对照；会把窗口扩展到约 3 年 |
-| `--data-root` | 独立湖根目录（默认 `data/cnequity-demo`） |
+| `--data-root` | 独立湖根目录（默认 `data/cnequity-demo`；sample 为 `data/cnequity-sample`） |
 | `--profile sample` | 不访问网络，生成可用于验证安装、查询和 DuckDB 视图的合成样例；不可与 `--research` / `--intraday` 合用 |
 | `--trade-date` | 截至日 YYYY-MM-DD（默认今天 / 最近交易日） |
-| `--config-out` | 写出供后续 `cne query` 使用的小配置（默认 `configs/cnequity.demo.toml`） |
+| `--config-out` | 写出供后续 `cne query` 使用的小配置（默认 `configs/cnequity.demo.toml`；sample 为 `configs/cnequity.sample.toml`） |
 | `--force` | 允许覆盖内容不同的已有 `--config-out`；默认保留原文件并报错，内容相同可直接重跑 |
 
 流程：建目录 → 探测 TDX → 拉 instruments 并裁成 demo 宇宙 → 交易日历 → `daily_bars` + compact → 打印样例表；加 `--research` 时再派生 Sina hfq 并校验 exact 覆盖，加 `--intraday` 时再跑 `minute_bars`。终端有分阶段进度与 INFO 日志。需要能访问 TDX；`allow_mock` 不会打开。
@@ -395,19 +395,19 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 | `--shfe-annual-archive ZIP --archive-year YYYY --accept-partial-fields` | 仅 `futures_bars` / `option_bars`：显式离线导入上期所年度包，保留缺失字段标记，跳过已有日线主键；`--archive-url` / `--archive-downloaded-at` 可附原始来源证据。默认回填仍用完整日文件，细节见[衍生品指南](../recipes/derivatives.md#官方年度包已验证格式与使用限制) |
 | `--symbols` | 日内、`daily_bars`、`trading_status`、`corporate_actions`、`share_structure` 的临时标的范围（`share_structure` 按证券一次取回全部股本变动，用于审计提示的股本滞后）；其他数据集仍使用配置中的范围 |
 | `--baostock-repair` | 仅 `corporate_actions`：显式补抓已退市 SH/SZ 标的的 Baostock 分红除权数据；建议与 `--symbols` 配合 |
-| `--ths-repair` | 仅 `corporate_actions`，历史迁移用：显式补抓已退市 BJ 标的的同花顺历史分红除权数据；建议与 `--symbols` 配合 |
-| `--eastmoney-bj-repair` | 仅 `corporate_actions`，历史迁移用：按北交所旧码→920 新码映射向 EastMoney 定向补抓历史分红除权数据；建议与 `--symbols` 配合 |
+| `--ths-repair` | 仅 `corporate_actions`：显式补抓已退市 BJ 标的的同花顺历史分红除权数据；建议与 `--symbols` 配合 |
+| `--eastmoney-bj-repair` | **已弃用。** 仅 `corporate_actions`，只用于仍以北交所旧码存储的湖：按北交所旧码→920 新码映射向 EastMoney 定向补抓历史分红除权数据；建议与 `--symbols` 配合 |
 | `--issuer-notice-repair` | 仅 `corporate_actions`：只用发行人实施公告（已审清单、巨潮、北交所）补现金到账日并应用已审送转条款；早于除权日的已存到账日当作未知，找不到就清空。不请求 Baostock。需要 `--symbols`/`--start`/`--end` |
 | `--payment-date-repair` | 同上，发行人公告之后再用 Baostock `dividPayDate` 匹配余下事件；两者不能同时使用 |
 | `--outstanding` | 精确修复被容忍缺口记下的欠账键：作用域与窗口取自 ledger，而不是 `--symbols`/`--start`/`--end`。补上的键即刻销账，仍缺的继续欠着 |
-| `--bj-amount-repair` | 已由 `--tdx-amount-repair` 取代，保留以兼容旧脚本：从 TDX 补 Sina 从未发布的 BJ 成交额，已存的价格与成交量一律不动。需要 `--start`/`--end` |
+| `--bj-amount-repair` | **已弃用**，请改用 `--tdx-amount-repair`：从 TDX 补 Sina 从未发布的 BJ 成交额，已存的价格与成交量一律不动。需要 `--start`/`--end` |
 | `--tdx-amount-repair` | 仅 `daily_bars`：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。需要 `--start`/`--end` |
 | `--turnover-repair` | 仅 `daily_bars`：成交额缺失、为 0 或量额单位错位的沪深股票行，用 Baostock 同日行整行替换；开高低收须在半分钱内一致，不一致或未提供的保留原值并计数。需要 `--start`/`--end` |
 | `--turnover-peer-review` | 与 `--turnover-repair` 同用，先用上交所历史日 K 或深交所实际日期报表核对 Baostock 价格，再用通达信和东财复查其余冲突。整行替换须有一致价格和可用量额；交易所汇总成交量、成交额不能拼接进竞价日线，仍有冲突或来源不可用的保留并计数。 |
-| `--tdx-volume-repair` | 仅 `daily_bars`：重读 TDX，只改写已存 TDX 行的成交量（及 64.5 元以下被放大的成交额），修 2026-09-17 前的解码错误；价格须一致，不新增行，不经内部缺口门禁。需要 `--symbols` 和 `--start`/`--end` |
-| `--bse-tip-repair` | 仅 `daily_bars`，历史迁移用：读取已有 session 的 OHLCV，仅向 BSE 请求成交额并严格核对；必须同时指定相同的 `--start/--end` 与 `--symbols` |
+| `--tdx-volume-repair` | **已弃用。** 仅 `daily_bars`：重读 TDX，只改写已存 TDX 行的成交量（及 64.5 元以下被放大的成交额），修 2026-09-17 前的解码错误；价格须一致，不新增行，不经内部缺口门禁。需要 `--symbols` 和 `--start`/`--end` |
+| `--bse-tip-repair` | 仅 `daily_bars`：读取已有当期 session 的 OHLCV，仅向 BSE 请求成交额并严格核对；必须同时指定相同的 `--start/--end` 与 `--symbols` |
 
-北交所的修复开关（`--ths-repair`、`--eastmoney-bj-repair`、`--bse-tip-repair`、`--bj-amount-repair`）只用于整理既有历史，日更不会用到。新数据由写入时的规则保证：
+`--eastmoney-bj-repair`、`--bj-amount-repair` 和 `--tdx-volume-repair` 已弃用，将在 0.20.0 移除：它们只修 0.17 及更早版本写入的数据（`--bj-amount-repair` 请改用 `--tdx-amount-repair`），使用时在 stderr 打印弃用警告。`--ths-repair` 补已退市北交所标的的公司行为，`--bse-tip-repair` 在日更时行情板不可用后补最近一个交易日的成交额，两者仍然保留。日更不会用到这些开关，新数据由写入时的规则保证：
 
 | 以前靠修复开关处理的问题 | 现在的处理 |
 |---|---|
@@ -514,9 +514,13 @@ python scripts/delisted_ops.py coverage --start 2016-01-01 --universe all_a_sh_s
 cne derive trading_status --start 2001-01-01 --end 2001-12-31
 ```
 
+`cne derive bse_code_migration`（把北交所旧码合并到 920 新码）和 `cne derive valuation_orphans`（删除没有日线的证券的估值行）已弃用，将在 0.20.0 移除。它们只迁移 0.17 及更早版本写入的湖：新采集不会再把北交所改名记成退市，`valuation_metrics` 回填时也会自动清理孤立的估值行。运行时在 stderr 打印弃用警告。
+
 ## cne repair
 
 默认基于湖中已有数据输出计划；加 `--apply` 后以新版本发布，旧版本继续保留，可按版本读取。`corporate-action-gaps --apply` 会按缺口向数据源补取证据。
+
+**一次性迁移命令已弃用，将在 0.20.0 移除。** `missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window` 和 `misdated-valuation` 只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题。新建的湖不需要运行；旧湖如需迁移，请在升级到 0.20.0 之前用 0.18 或 0.19 运行。运行这些命令时会在 stderr 打印弃用警告，stdout 的 JSON 报告不变。
 
 `--apply` 发布前会比较已提交版本与候选版本的离线质量检查。历史因子/公司行为矛盾单独记录为非阻断诊断。无效因子数值、损坏文件、主键错误等结构问题新增或恶化时会阻止发布，候选版本移入 `_quarantine`，报告写入 `meta/quality/publication/`。这项修复门禁不受 `[quality].publication_gate` 的普通日更发布设置影响。
 
@@ -524,22 +528,22 @@ cne derive trading_status --start 2001-01-01 --end 2001-12-31
 |------|------|
 | `layout DATASET` | 把分区数据集根目录或错误键目录中的文件并入登记分区。同一主键的多份观察只在非空值完全一致时互补填空；有冲突的键按规范规则整行保留一份。重复键的全部原始观察写入 `_quarantine`。发布新版本时若检测到这类布局，会提示运行此命令 |
 | `corporate-action-gaps` | 补上新浪与 Baostock 因子都有台阶、湖里却没有记录的除权事件，依据最近一次 `cne derive adj_factor_source` 的证据。附近 10 天内日期错开的记录，若条款能解释台阶就移到台阶日；其余按证券和年份向 Baostock 取分红，按生效交易日匹配，只收条款能解释台阶的行；Baostock 也解释不了的，再到巨潮查发行人的重整转增公告，公告写明的除权参考价能解释台阶才记为 `reorg_transfer`。此命令的计划仍离线，`--apply` 才请求 Baostock 和巨潮 |
-| `orphan-symbols` | 删除 `daily_bars` 中从未出现的证券在 `adj_factors` 与 `corporate_actions` 里的行：早年作为净值序列误入的场外基金（519xxx）行情已清理，因子和分红却残留；未采集行情的上市基金也在其列。这些行没有可复权的价格，只会被报成因子与公司行为矛盾。按数据集各发布一个新版本 |
-| `stale-suspensions` | 删除 `trading_status` 中已被实际成交日线否定的推断停牌（`derived_bar_gap`）：某次运行漏抓行情时，缺口曾被误记为停牌；行情补齐后同一天有成交的日线即证明该行错误。独立来源的停牌不受影响 |
-| `status-outages --start --end` | 按现行规则重建东财不可用期间写入的 `trading_status` 行（`eastmoney_cached`）。旧版兜底会沿用自己写的缓存行，长假会让缓存过期，并把没有记录的证券记成停牌。窗口内的缓存行全部删除；当天主源答复的证券不到前几个交易日一半的交易所，没有其他记录的证券沿用前 5 个交易日内最近的一手记录，并保留该记录的抓取时间，因此 Baostock 历史与日线缺口推断的停牌仍然优先。没有一手记录的证券不写行 |
-| `status-listing-window` | 删除 `trading_status` 中落在证券上市日之前、或没有退市记录支撑的行。旧版合并曾把尚无日线的新证券推断为退市，状态步骤随后在它们上市后的头几个交易日写入 `derived_delisted`；东财也会把尚未上市的代码报成正常交易。`derived_delisted` 行只在当前 `instruments` 仍记有不早于上市日、且不晚于该行的退市日时保留；上市日之前的行一律删除，除非日线在上市日之前就有成交（这时上市日有误）。不补写行。发布新版本，旧版本保留 |
+| `orphan-symbols` | **已弃用。** 删除 `daily_bars` 中从未出现的证券在 `adj_factors` 与 `corporate_actions` 里的行：早年作为净值序列误入的场外基金（519xxx）行情已清理，因子和分红却残留；未采集行情的上市基金也在其列。这些行没有可复权的价格，只会被报成因子与公司行为矛盾。按数据集各发布一个新版本 |
+| `stale-suspensions` | **已弃用。** 删除 `trading_status` 中已被实际成交日线否定的推断停牌（`derived_bar_gap`）：某次运行漏抓行情时，缺口曾被误记为停牌；行情补齐后同一天有成交的日线即证明该行错误。独立来源的停牌不受影响 |
+| `status-outages --start --end` | **已弃用。** 按现行规则重建东财不可用期间写入的 `trading_status` 行（`eastmoney_cached`）。旧版兜底会沿用自己写的缓存行，长假会让缓存过期，并把没有记录的证券记成停牌。窗口内的缓存行全部删除；当天主源答复的证券不到前几个交易日一半的交易所，没有其他记录的证券沿用前 5 个交易日内最近的一手记录，并保留该记录的抓取时间，因此 Baostock 历史与日线缺口推断的停牌仍然优先。没有一手记录的证券不写行 |
+| `status-listing-window` | **已弃用。** 删除 `trading_status` 中落在证券上市日之前、或没有退市记录支撑的行。旧版合并曾把尚无日线的新证券推断为退市，状态步骤随后在它们上市后的头几个交易日写入 `derived_delisted`；东财也会把尚未上市的代码报成正常交易。`derived_delisted` 行只在当前 `instruments` 仍记有不早于上市日、且不晚于该行的退市日时保留；上市日之前的行一律删除，除非日线在上市日之前就有成交（这时上市日有误）。不补写行。发布新版本，旧版本保留 |
 | `status-traded --start --end` | 默认只读预览：用已提交日线的正成交量补已知上市期间、缺状态行的股票/ETF 键，来源 `derived_traded`，ST 保持 null。已有状态不覆盖；`--apply` 重新核对当前版本后发布并保留旧版本。建议按年或月分段 |
-| `fund-listing-dates` | 从完整的上交所、深交所 ETF/LOF 当前目录补未知上市日期，独立于研究资格。预览也请求来源；`--apply` 归档响应、经修复门禁发布新版本，保留已有日期及旧版本，不把首根日线当上市日 |
+| `fund-listing-dates` | **已弃用。** 从完整的上交所、深交所 ETF/LOF 当前目录补未知上市日期，独立于研究资格。预览也请求来源；`--apply` 归档响应、经修复门禁发布新版本，保留已有日期及旧版本，不把首根日线当上市日 |
 | `stock-listing-dates` | 用有成交但上市日期未知的股票首日定位巨潮 IPO 日历请求，也可用可重复的 `--event-date YYYY-MM-DD` 核验尚无日线的股票；只接受代码、日期匹配的明确上市事件，不能与更早成交矛盾。默认回放归档，`--refresh-sources` 联网采证，`--max-sessions` 分批；`--apply` 发布并保留已有日期和旧版本；若补入的官方上市日期晚于残留退市日期，同一修订清除该矛盾退市日期 |
 | `index-snapshots` | 回放官方带日期的完整成分、权重文件；`--refresh-sources` 更新归档，`--indices` 选择指数。`--apply` 替换整个指数快照，百分数转比例，成分与权重按各自日期保存，不倒推历史 |
 | `financial-originals` | `--symbols` 或 `--all-stocks` 选择股票，`--start-year/--end-year` 选择年份，`--quarter` 选择 Q1/Q2/Q3/Q4（默认年报），`--max-reports` 分批，`--after` 接续输出的 `next_cursor`。默认离线预览，`--refresh-sources` 归档巨潮完整查询和原始 PDF，`--apply` 追加可明确识别的合并报表当期数和累计数；`--reparse` 重放旧报告并保留未变行的首次观测时间；未识别布局或科目保留缺口，不回填采集时间 |
 | `adj-factors` | 统一股票因子与 ETF/LOF 份额折算修复。默认离线预览并保存计划；`--refresh-sources` 显式联网采证，`--apply` 复查输入后发布确定的修正。支持 `--symbols`、事件窗口 `--start/--end`、`--max-symbols` 和 `--plan`；未解决事件保留原值和提示。详见 [历史因子修复](../datasets/sources.md) |
-| `fund-factors` | 离线预览 ETF/LOF 已记录拆分、转增的漏跳；从原始来源序列重建完整历史，保留其他来源台阶和现金分红口径。`--apply` 经修复门禁发布 `derived_fund_actions` 并保留旧版本。条款冲突或缺少原始序列时不猜补 |
+| `fund-factors` | **已弃用。** 离线预览 ETF/LOF 已记录拆分、转增的漏跳；从原始来源序列重建完整历史，保留其他来源台阶和现金分红口径。`--apply` 经修复门禁发布 `derived_fund_actions` 并保留旧版本。条款冲突或缺少原始序列时不猜补 |
 | `fund-volume` | 用上交所完整历史 K 线修复沪深场内基金零成交量、正成交额的行。`--refresh-sources` 归档来源，默认离线回放；`--apply` 仅替换上市窗口内、开高低收及舍入金额一致的行并保留旧版本。若湖中金额冲突，须有已归档的东财未复权日线同时证实价格和金额，才替换整行；东财整手成交量不参与补量。优先复用相符的原始响应归档，避免重复请求。不得用成交额倒算成交量。 后续重抓的零量正额行不会覆盖已恢复的有效成交量。 |
 | `fund-no-print` | 用深交所明确的零成交额，或上交所按证券和日期返回的零竞价开高低及正参考价，核对日线欠账。默认离线预览；`--refresh-sources` 联网归档报表，`--max-sessions` 限制交易日数；`--apply` 保存证明并刷新覆盖水位。缺失响应不构成证明，正常可交易不等于当日有成交；舍入量额为零本身不足以证明无成交；上交所覆盖证明表示未形成竞价日线，不能据此否认汇总口径成交，不生成日线或停牌行。证据失效会重新打开欠账，实际成交记录优先 |
-| `daily-bar-coverage` | 逐证券复查 `bj_session_incomplete` 整日欠账；仅按已提交日线的正成交量或独立停牌证据结清已知上市区间。`--apply` 更新覆盖元数据和水位，保存输入版本及收据，不改日线。同样结清已提交且不与成交历史矛盾的上市日期所证明的上市前欠账；未知上市日期仍由逐证券覆盖报告列为未核实 |
-| `misdated-valuation` | 替换 `valuation_metrics` 中盖错交易日的 push2 快照行。快照不带日期，只描述抓取时最近一个已收盘的交易日；抓取时刻对应的交易日与行上日期不同的行，`--apply` 时删除，并在同一版本中换成东财 datacenter 按该日期发布的估值；datacenter 没有的键不再保留错误的行。计划离线，`--apply` 才请求 datacenter |
-| `valuation-basis` | 统一 `valuation_metrics` 口径：push2 动态市盈率移入 `pe_dynamic`；Baostock 流通市值由成交均价口径换算为收盘价口径，无法核对的保留原值并标为 `vwap_x_turn_implied_shares`；总市值按 `share_structure` 当日有效总股本重建，无记录的标为年末股本估算 |
+| `daily-bar-coverage` | **已弃用。** 逐证券复查 `bj_session_incomplete` 整日欠账；仅按已提交日线的正成交量或独立停牌证据结清已知上市区间。`--apply` 更新覆盖元数据和水位，保存输入版本及收据，不改日线。同样结清已提交且不与成交历史矛盾的上市日期所证明的上市前欠账；未知上市日期仍由逐证券覆盖报告列为未核实 |
+| `misdated-valuation` | **已弃用。** 替换 `valuation_metrics` 中盖错交易日的 push2 快照行。快照不带日期，只描述抓取时最近一个已收盘的交易日；抓取时刻对应的交易日与行上日期不同的行，`--apply` 时删除，并在同一版本中换成东财 datacenter 按该日期发布的估值；datacenter 没有的键不再保留错误的行。计划离线，`--apply` 才请求 datacenter |
+| `valuation-basis` | **已弃用。** 统一 `valuation_metrics` 口径：push2 动态市盈率移入 `pe_dynamic`；Baostock 流通市值由成交均价口径换算为收盘价口径，无法核对的保留原值并标为 `vwap_x_turn_implied_shares`；总市值按 `share_structure` 当日有效总股本重建，无记录的标为年末股本估算 |
 
 ```bash
 cne repair layout futures_bars
@@ -643,11 +647,11 @@ cne verify --derivatives --dataset futures_bars --start 2026-09-01 --end 2026-09
 | `publication_status` | `pending` / `published` / `partial` / `unchanged` / `none` / `rejected`，描述当前运行的版本发布 |
 | `fallback` | 来源受限时列出已有可读数据、注册来源角色与开关、请求范围和重试命令；来源列表不代表已尝试或当前可达 |
 | `reason_code` | 数据集回执和批次保留结构化原因，例如 `source_transient`、`source_unavailable`、`input_unavailable`、`storage_failure`、`execution_error` |
-| `usable_result` | 有有效请求结果、已覆盖范围或明确无数据证据；来源受限且本次 0 行可以为 false，不能据此判定执行失败 |
+| `usable_result` | 有有效请求结果、已覆盖范围或明确无数据证据；来源受限且本次 0 行可以为 false。日更等不因此判定执行失败；`cne backfill` 在此时退出 1，见下文 |
 
-`completed + partial` 可以是正常终态。已校验事实可以发布，缺失范围、未扫描证券、冷却与重试证据继续留在台账中。缺输入的派生会解释跳过；派生版本记录输入版本和覆盖证据，输入变化时要求重算。来源全部不可用且本次没有有效请求结果，也正常结束为覆盖不足，保留已有湖；程序、配置、存储、完整性错误仍报告失败。
+`completed + partial` 可以是正常终态。已校验事实可以发布，缺失范围、未扫描证券、冷却与重试证据继续留在台账中。缺输入的派生会解释跳过；派生版本记录输入版本和覆盖证据，输入变化时要求重算。来源全部不可用且本次没有有效请求结果，也正常结束为覆盖不足，保留已有湖（`cne backfill` 的退出码见下文）；程序、配置、存储、完整性错误仍报告失败。
 
-取数 / 写入命令：`success`、来源受限的 `warning` / `degraded`（包括 0 行）返回 0，`failed` 返回 1。显式质量检查（`audit`、`verify`、`status --gate`）继续按各自质量规则返回非零。只读报告成功读取并展示后返回 0，不要求报告中的数据完全健康。
+取数 / 写入命令：`success`、来源受限的 `warning` / `degraded`（包括 0 行）返回 0，`failed` 返回 1。例外是 `cne backfill`（含 `--outstanding`）：状态不是 `success`、`usable_result` 为 false 且本次写入 0 行时返回 1，因为回填就是为了补这段范围，一行都没补上即为失败；数据源不可用和数据源无法提供该范围（`capability_limit`）都属于这种情况，JSON 结果与 `fallback` 不变。显式质量检查（`audit`、`verify`、`status --gate`）继续按各自质量规则返回非零。只读报告成功读取并展示后返回 0，不要求报告中的数据完全健康。
 
 **升级调度脚本：** 若以前依靠 `status --datasets` 的退出码触发告警，改为 `status --datasets --gate`（按组调度时同时加 `--groups`）。依赖日更 / 回填退出码 2 的脚本，应读取 `coverage_status`，或另行运行显式质量门禁。现有数据目录、manifest、检查点和成功批次不需要删除；旧元数据以增量方式迁移。旧部分 staging 没有校验封存时保持保守门禁，通过原范围重试后再发布。
 
@@ -711,31 +715,24 @@ init 不属于任何调度组，因此不受 `--groups` 豁免；截面校验则
 | `--reconcile-after-seconds` | 覆盖对账静默窗口，默认取 `[orchestrator].batch_stale_seconds` |
 | `--force` | 将未 cleanup-ready 的 staging 也列入预览，不删除、不降级批次 |
 
-输出 `dry_run: true`、`confirmation_required: "serve_storage_page"`。`removed` / `removed_run_ids` 等实际删除字段为空或 0，`bytes_freed` 全部为 0；候选见 `candidate_run_ids`、`candidate_run_dirs`、`candidates`，账面大小见 `logical_bytes_selected`。历史版本、登记试验和已成功 compact 且无未完成批次的终态 staging 可在 serve 存储运维页勾选、审核并确认删除。确认时重新核验运行锁、引用保留、运行状态和逐文件指纹；执行只处理原清单，并保留可恢复的删除收据。orphan、未合并和有未完成批次的 staging 不在网页删除范围，来源快照和日志仍仅报告。
+输出 `dry_run: true`、`confirmation_required: "serve_storage_page"`。`removed` / `removed_run_ids` 等实际删除字段为空或 0，`bytes_freed` 全部为 0；候选见 `candidate_run_ids`、`candidate_run_dirs`、`candidates`，账面大小见 `logical_bytes_selected`。历史版本和已成功 compact 且无未完成批次的终态 staging 可在 serve 存储运维页勾选、审核并确认删除。确认时重新核验运行锁、引用保留、运行状态和逐文件指纹；执行只处理原清单，并保留可恢复的删除收据。orphan、未合并和有未完成批次的 staging 不在网页删除范围，来源快照和日志仍仅报告。
 
 预览另返回 `staging_inventory`、`staging_run_count` 和 `skipped_reasons`，逐运行列出状态、大小、年龄、未完成批次和候选/保留原因。正在重试的运行由运行锁保护；`--force` 不绕过运行锁或 hold。未完成批次不会仅因年老或存在更新的成功运行而自动淘汰。
 
 ## cne storage
 
-版本生命周期包括引用登记、不可变计划、原地观察期和维护窗口下的物理回收。满 7 天不会自动删除。试验目录可先归档再退出原位置；外部读取须由操作者停止。
+版本生命周期包括引用登记、不可变计划、原地观察期和维护窗口下的物理回收。满 7 天不会自动删除。外部读取须由操作者停止。
 
 | 命令 | 行为 |
 |---|---|
-| `inspect --keep 5` | 只读列出仍存在的版本、保留原因和登记试验；未导入引用时仅为初筛 |
+| `inspect --keep 5` | 只读列出仍存在的版本和保留原因；未导入引用时仅为初筛 |
 | `explain OBJECT_ID` | 显示版本的 current/recent/hold 等依据 |
 | `import --manifest FILE` | 校验并合并已审核的本地引用清单；不会自动解除已有保护 |
-| `hold OBJECT_ID --reason TEXT` | 新增版本、试验、工件或清理资源的保留理由，取消相应待删除标记 |
+| `hold OBJECT_ID --reason TEXT` | 新增版本或清理资源的保留理由，取消相应待删除标记 |
 | `plan --keep 5 --phase mark` | 校验引用源后保存内容寻址的标记计划，返回 `plan_id` |
 | `plan --keep 5 --phase purge` | 只选择观察期已满且内容未变的候选，逐文件核对 SHA-256；输出 `purge_ids` 和 `logical_bytes_to_purge` |
 | `apply PLAN_ID --phase mark` | 再次校验指针、引用、登记和文件身份，开始至少 7 天的原地观察期 |
 | `apply PLAN_ID --phase purge` | 已禁用；必须转到 serve 存储运维页重新检查并确认 |
-| `experiment-create --parent DIR --case-id ID` | 新建独立实例身份的空试验目录，登记为 active |
-| `archive OBJECT_ID --destination DIR` | 独立复制已登记试验，逐文件校验后封存工件；保留原目录 |
-| `experiment-seal OBJECT_ID --artifact-id ID` | 显式声明试验结束，校验源身份与归档一致后登记 sealed |
-| `artifact-verify OBJECT_ID` | 校验工件文件集合、大小和 SHA-256 |
-| `resolve OLD_PATH [--artifact-id ID]` | 校验并返回旧路径对应的归档位置；多版本时必须明确选择 |
-| `experiment-plan --phase mark\|purge` | 为非 active、无引用/hold 且原内容与归档一致的试验原目录生成计划 |
-| `experiment-apply PLAN_ID` | 仅执行 mark；purge 必须转到 serve 网页确认 |
 
 每个子命令接受 `--config`。版本 `OBJECT_ID` 为当前湖内的 `revision/<dataset>/<revision_id>`；计划另外绑定湖身份及 metadata 根，不能直接在另一个湖使用。被引用但暂时缺失的版本也可通过清单登记保护，以便恢复后继续受到保护。
 
@@ -752,10 +749,6 @@ init 不属于任何调度组，因此不受 `--groups` 豁免；截面校验则
 `logical_bytes_deleted` 仅累计已完整删除的版本；部分失败的字节不计入，并报告 `partial_deletion_possible`。文件系统可用空间另记录前后值，可能受到其他系统活动影响。待删除标记和删除收据都不能替代备份。
 
 `logical_bytes_selected` 来自版本文件清单，不是实际磁盘释放量；APFS 克隆和系统快照可使两者相差很大。标记阶段所有字节保持原位。
-
-试验使用 `experiment/<id>`，归档使用 `artifact/<manifest-digest>`。归档采用独立 inode 的复制，支持时使用文件系统克隆；中断副本保留为 `.incomplete-*`，不会登记为 sealed。归档不会自动停止源写入或解除旧 hold，也不证明完整重放可用。托管试验需显式 `experiment-seal` 才退出 active；归档本身不改变此状态。后续源内容改变会阻止按旧归档清理。
-
-旧报告保持不变。读取者需要显式调用 `ArtifactStore.resolve()` 或使用 `storage resolve` 的结果。归档目录解析会校验整个工件，文件解析会校验对应文件。发现原目录引用时继续保留原位置；只有完成消费者迁移并重新审核引用，才能进入观察期。试验清理收据位于 `meta/lifecycle/experiment-purges/`，删除的是冗余原位置，封存工件保持可用。失败后重试同一计划会核验残留；路径被新试验复用时停止。
 
 现有其他清理器共享 hold：`staging/<run_id>`、`source_snapshot/<dataset>/source=<source>/data_version=<version>/run_id=<run>`、`log/<cne-*.log文件名>`。可通过 `storage hold` 保护已存在对象，或由 case 的 `requires_bytes` 提供保护。年龄、compact/readiness 和每类最新快照规则继续有效；`--force` 不绕过 hold。登记后的引用源发生变化或不可读时，这些清理器也停止并要求刷新清单。
 

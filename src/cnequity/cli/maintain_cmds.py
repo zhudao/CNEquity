@@ -20,6 +20,7 @@ from cnequity.cli._shared import (
     attach_log_file,
     config_option,
     parse_date_option,
+    warn_deprecated_migration,
 )
 from cnequity.derive.adj_factors import compute_adj_factors
 from cnequity.domain.datasets import RESAMPLED_MINUTE_DATASETS
@@ -226,7 +227,15 @@ def _published_derive(cfg, dataset: str):
                 if not dataset_has_parquet(store.current_root(name))
             ]
             if missing:
-                raise InputUnavailableError(f"{dataset}: missing input {', '.join(missing)}")
+                from cnequity.research.packs import next_command_for_dataset
+
+                remedies = ", ".join(
+                    f"`{next_command_for_dataset(name) or f'cne backfill {name}'}`"
+                    for name in missing
+                )
+                raise InputUnavailableError(
+                    f"{dataset}: missing input {', '.join(missing)}; build it first with {remedies}"
+                )
             yield outcome
             revision = _publish_derived_revision(
                 cfg,
@@ -299,7 +308,13 @@ def _published_derive(cfg, dataset: str):
         raise
 
 
-@cli.command()
+@cli.command(
+    epilog=N_(
+        "Deprecated targets: bse_code_migration and valuation_orphans only migrate lakes written "
+        "by cnequity 0.17 or earlier and will be removed in 0.20.0; a valuation_metrics backfill "
+        "already drops orphan valuation rows."
+    )
+)
 @click.argument("name", default="adj_factors")
 @config_option
 @click.option(
@@ -370,6 +385,8 @@ def derive(
     # Derive targets are lower case in the registry, and command names are
     # already case-insensitive; a target typed in caps should resolve the same.
     name = name.lower()
+    if name in {"bse_code_migration", "valuation_orphans"}:
+        warn_deprecated_migration(f"cne derive {name}")
     cfg = _cfg(config_path)
     attach_log_file(cfg, "derive")
     start = parse_date_option(start_str, "--start")
@@ -456,12 +473,18 @@ def derive(
     elif name == "sector_routing":
         from cnequity.derive.sector_routing import derive_sector_routing
 
-        summary = derive_sector_routing(cfg)
+        try:
+            summary = derive_sector_routing(cfg)
+        except RuntimeError as exc:  # missing input or source: the message says what to do
+            raise click.ClickException(str(exc)) from exc
         click.echo(json.dumps(summary, indent=2, default=str))
     elif name == "sector_code_map":
         from cnequity.derive.sector_code_map import derive_sector_code_map
 
-        summary = derive_sector_code_map(cfg)
+        try:
+            summary = derive_sector_code_map(cfg)
+        except RuntimeError as exc:  # missing input or source: the message says what to do
+            raise click.ClickException(str(exc)) from exc
         click.echo(json.dumps(summary, indent=2, default=str))
     elif name == "valuation_orphans":
         from cnequity.storage.repairs.valuation_orphans import purge_valuation_orphan_symbols
@@ -559,7 +582,7 @@ def clean(
     "Cleanable" means: the run is in a terminal state (success/warning/degraded/failed), every batch has settled,
     and a successful compact has been recorded. Staging that did not finish or was never compacted stays for a retry;
     --force only widens the preview. Source snapshots and logs are preview-only too, with bytes_freed 0 throughout.
-    Old versions, registered experiments, and staging that merged successfully with no unfinished batches can be deleted after confirming on the serve storage page.
+    Old versions and staging that merged successfully with no unfinished batches can be deleted after confirming on the serve storage page.
     Orphaned staging, source snapshots and logs are only reported for now.
 
     """
@@ -756,7 +779,13 @@ def stats_rebuild(config_path: str, dataset_names: tuple[str, ...], if_stale: bo
         )
     )
     if result.empty:
-        click.echo(_("No parquet yet: {value}").format(value=", ".join(sorted(result.empty))))
+        # A first lake holds a few of the registered datasets; the other fifty
+        # names are noise, and `cne status --datasets` already lists them.
+        click.echo(
+            _(
+                "{value} registered datasets have no parquet yet (see `cne status --datasets`)"
+            ).format(value=len(result.empty))
+        )
 
 
 def _scan_curated_datasets(cfg) -> list[dict]:

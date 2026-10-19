@@ -92,6 +92,7 @@ Main sources and request channels in the template:
 | `push2_shared_snapshot` (eastmoney) | On by default. instruments, valuation_metrics, fund_flow and the clist quote fallback share one full-market pagination (fetching the union of fields), reused from after the close until the next day's open |
 | `push2_min_interval_seconds` / `push2_max_concurrency` (eastmoney) | Default 4.0 seconds / 1. A separate rate-limit channel for push2, not shared with datacenter |
 | `datacenter_breaker` / `datacenter_breaker_strikes` (eastmoney) | Default on / 3. After 3 consecutive datacenter rejections (403 / 429 / 5xx, connection refused/reset/dropped), it is disabled for the day; read timeouts do not count; if “请求过于频繁” (too many requests) persists after backoff, it is disabled immediately |
+| `news_breaker` / `news_breaker_strikes` (eastmoney) | Default on / 3. After 3 consecutive fast-news sweeps are refused (403 / 429 / shared cooldown), the lane (handshake + list host) is closed until the next local day; a dead proxy or a read timeout does not count, and one success resets the count |
 | `datacenter_daily_budget` (eastmoney) | Default 0: count only, no cap (the count is in `CNE_RATE_LIMIT_ROOT/eastmoney_guard.json`, by default this lake's `meta/rate_limits/`). Set a cap based on measured usage |
 | `daily_budget` (eastmoney) | Default 0: count only; when set, it enforces a shared daily cap on push2 and datacenter requests from the same egress, so that the vendor does not receive too many requests in total even when neither exceeds its own cap. The shared ledger lives in `CNE_RATE_LIMIT_ROOT`. |
 | `datacenter_min_interval_seconds` / `datacenter_max_concurrency` (eastmoney) | Default 1.0 seconds / 2. A separate rate-limit channel for datacenter; other EastMoney hosts still follow `min_interval_seconds` and `source_concurrency.eastmoney` |
@@ -358,6 +359,17 @@ Announcements may be indexed late. The weekly deep reconciliation rechecks older
 | `datasets` | Built-in critical/snapshot set | Leave empty to use the default set; paged raw responses from financial statement and shareholder backfills are archived page by page to keep evidence from pages that succeeded midway. An explicit list can narrow it to fit the disk budget. |
 
 **Request credentials, proxy settings, cookies and authorization headers are never archived.**
+
+Large payloads such as financial report PDFs can live on a separate drive or in iCloud Drive while source, observation-time and hash sidecars stay local. Create the destination directory, then register it:
+
+```bash
+cne storage raw-external --dataset financial_statement_items --source cninfo \
+  --root "$HOME/Library/Mobile Documents/com~apple~CloudDocs/CNEquity/archives/my-lake"
+```
+
+By default only new PDF payloads go to the external folder; other responses stay local. The lake stores the registration in `meta/raw_storage.json`, which all archive readers recognize automatically. Historical `payload_path` values stay unchanged and no symlinks are used. Registration does not migrate existing files. Copy them under the external root at their original `payload_path`, verify bytes and hashes, and confirm cloud upload before removing local payloads. Keep the local `.json` source sidecars.
+
+Replay requires the external folder to be available; cloud files may need downloading first. An unavailable folder fails explicitly rather than being recreated empty or fetching the provider again. Portable snapshots materialize external payloads without machine-specific locations, which may download cloud files. macOS manages iCloud synchronization and Remove Download; registration alone does not confirm upload.
 
 ## `[exchange_audit]`
 

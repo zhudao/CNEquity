@@ -92,6 +92,7 @@ cne config validate --config configs/cnequity.toml
 | `push2_shared_snapshot`（eastmoney） | 默认开。instruments、valuation_metrics、fund_flow 和 clist 行情兜底共用一次全市场翻页（取字段并集），收盘后到次日开盘前重复使用 |
 | `push2_min_interval_seconds` / `push2_max_concurrency`（eastmoney） | 默认 4.0 秒 / 1。push2 单独的限速通道，不和 datacenter 共用 |
 | `datacenter_breaker` / `datacenter_breaker_strikes`（eastmoney） | 默认开 / 3。datacenter 连续 3 次被拒（403 / 429 / 5xx、连接被拒/重置/断开）当天停用；读超时不算；「请求过于频繁」退避后仍在则立即停用 |
+| `news_breaker` / `news_breaker_strikes`（eastmoney） | 默认开 / 3。快讯通道（握手 + 列表主机）连续 3 次扫描被拒（403 / 429 / 共享冷却）后当天停用，次日恢复；代理不通、读超时不算，成功一次清零 |
 | `datacenter_daily_budget`（eastmoney） | 默认 0：只计数、不设上限（计数在 `CNE_RATE_LIMIT_ROOT/eastmoney_guard.json`，默认本湖 `meta/rate_limits/`）。按实测用量设上限 |
 | `daily_budget`（eastmoney） | 默认 0：只计数；设置后对同一出口的 push2 与 datacenter 请求实施共享日上限，避免分别未超额但厂商总请求过多。共享账本位于 `CNE_RATE_LIMIT_ROOT`。 |
 | `datacenter_min_interval_seconds` / `datacenter_max_concurrency`（eastmoney） | 默认 1.0 秒 / 2。datacenter 单独的限速通道；其他东财主机仍按 `min_interval_seconds` 和 `source_concurrency.eastmoney` |
@@ -358,6 +359,17 @@ audit step 依赖 `compact`，所以它在**行已经进 curated 之后**才跑�
 | `datasets` | 内置关键/快照集合 | 留空使用默认集合；财报及股东回填的分页原始响应会逐页归档以保留中途成功的证据。显式列表可按磁盘预算收窄。 |
 
 **请求凭证、代理设置、Cookie 和 authorization 头一律不存档。**
+
+财报 PDF 等大原文可以放到独立磁盘或 iCloud Drive，本地仍保留来源、观察时间及哈希记录。先创建目标目录，再登记：
+
+```bash
+cne storage raw-external --dataset financial_statement_items --source cninfo \
+  --root "$HOME/Library/Mobile Documents/com~apple~CloudDocs/CNEquity/archives/my-lake"
+```
+
+默认仅把新 PDF 原文写到外置目录，其他响应继续留在本地。登记保存在该湖的 `meta/raw_storage.json`，所有归档读者自动识别；不使用软链接，不改写历史 `payload_path`。命令只登记，不自动迁移旧文件。迁移时按原 `payload_path` 在目标根下复制、核对字节和哈希；确认副本完整及云端上传完成后才移除本地原文，保留本地 `.json` 来源记录。
+
+原文重放需要外置目录可用；云端文件可能需要先下载。目录不可用时会明确报错，不会重建一个空目录或重新请求供应商。可移植快照会包含外置原文且不携带本机路径，生成快照可能触发云文件下载。iCloud 同步和“移除下载”由 macOS 管理，登记命令不代表已经上传成功。
 
 ## `[exchange_audit]`
 

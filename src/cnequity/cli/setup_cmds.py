@@ -15,10 +15,14 @@ import click
 from cnequity.cli._root import cli
 from cnequity.cli._shared import (
     DEMO_CONFIG,
+    DEMO_DATA_ROOT,
+    SAMPLE_CONFIG,
+    SAMPLE_DATA_ROOT,
     _cfg,
     _progress_logging,
     _run_status_exit_code,
     attach_log_file,
+    comma_option,
     comma_values,
     config_option,
     ingest_scope_label,
@@ -195,7 +199,7 @@ def _reject_foreign_options(profile: str, names: tuple[str, ...]) -> None:
         "later with `cne backfill daily_bars`."
     ),
 )
-@click.option(
+@comma_option(
     "--symbols",
     default=",".join(("600519.SH", "000001.SZ", "000858.SZ", "300750.SZ", "601318.SH")),
     show_default=True,
@@ -209,14 +213,14 @@ def _reject_foreign_options(profile: str, names: tuple[str, ...]) -> None:
 )
 @click.option(
     "--data-root",
-    default="data/cnequity-demo",
-    show_default=True,
+    default=None,
+    show_default="data/cnequity-demo; sample: data/cnequity-sample",
     help=N_("demo/sample: separate lake root (do not use it for a full-market init)."),
 )
 @click.option(
     "--config-out",
-    default=DEMO_CONFIG,
-    show_default=True,
+    default=None,
+    show_default=f"{DEMO_CONFIG}; sample: {SAMPLE_CONFIG}",
     help=N_("demo/sample: where to write the small config for later `cne query` use."),
 )
 @click.option(
@@ -315,8 +319,8 @@ def init(
     profile: str,
     symbols: str,
     days: int,
-    data_root: str,
-    config_out: str,
+    data_root: str | None,
+    config_out: str | None,
     force: bool,
     intraday: bool,
     research: bool,
@@ -369,13 +373,17 @@ def init(
         _reject_foreign_options(profile, _LAKE_ONLY)
         from cnequity.cli.demo import run_demo, run_sample_demo
 
-        runner = run_sample_demo if profile == "sample" else run_demo
+        # Separate defaults per profile: the synthetic sample and the real demo
+        # sharing one config and one root meant the sample's own closing hint,
+        # "run `cne init --profile demo`", failed on the config it had written.
+        sample = profile == "sample"
+        runner = run_sample_demo if sample else run_demo
         runner(
             symbols=comma_values(symbols, "--symbols"),
             days=days,
-            data_root=Path(data_root),
+            data_root=Path(data_root or (SAMPLE_DATA_ROOT if sample else DEMO_DATA_ROOT)),
             trade_date=parse_date_option(trade_date, "--trade-date"),
-            config_out=Path(config_out),
+            config_out=Path(config_out or (SAMPLE_CONFIG if sample else DEMO_CONFIG)),
             intraday=intraday,
             research=research,
             force=force,
@@ -656,6 +664,21 @@ def config_cmd(
         )
     if dry_run and action != "upgrade":
         raise click.UsageError(_("--dry-run only applies to `cne config upgrade`"))
+    if action in {"upgrade", "diff"}:
+        # A demo or sample config deliberately schedules nothing; comparing it
+        # with the full example would list every step as missing, and
+        # upgrading it would turn five symbols into a whole-market schedule.
+        try:
+            profile = getattr(_cfg(config_path), "lake_profile", None)
+        except (click.ClickException, ValueError, OSError):
+            profile = None  # a config that does not load is the action's own error to report
+        if profile in {"demo", "sample"}:
+            click.echo(
+                _(
+                    "{path} belongs to a {profile} lake, which has no schedule to compare or upgrade; `cne init` builds a lake with a full config."
+                ).format(path=resolve_config_path(config_path), profile=profile)
+            )
+            return
     if action == "upgrade":
         _config_upgrade(resolve_config_path(config_path), dry_run=dry_run)
         return

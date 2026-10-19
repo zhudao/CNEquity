@@ -243,6 +243,11 @@ _OPTION_WORDS = {
 
 def _default(param: click.Parameter, ctx: click.Context, lang: str = "zh") -> str:
     words = _OPTION_WORDS[lang]
+    # A string `show_default` is what `--help` prints in place of the value,
+    # e.g. a default that depends on another option.
+    shown = getattr(param, "show_default", None)
+    if isinstance(shown, str):
+        return shown
     value = param.get_default(ctx, call=False)
     if value.__class__.__name__ == "Sentinel":
         return "—"
@@ -422,19 +427,13 @@ EFFECTS: dict[str, tuple[str, str]] = {
     "stats rebuild": ("无", "重建本地统计"),
     "stats show": ("无", "读取本地统计；过期或明细视图需要时自动重算"),
     "status": ("无", "读取运行状态与数据集覆盖"),
-    "storage archive": ("无", "复制已登记试验、逐文件校验并登记封存工件；保留源目录"),
-    "storage artifact-verify": ("无", "读取并校验封存工件完整内容"),
-    "storage experiment-create": ("无", "创建空试验目录和独立实例身份并登记 active"),
-    "storage experiment-seal": ("无", "显式结束试验并绑定已验证归档；源内容改变后不能按旧封存清理"),
-    "storage experiment-plan": ("无", "校验引用、原目录及归档，保存冗余原位置退出计划"),
-    "storage experiment-apply": ("无", "仅原地标记试验；CLI purge 禁用，删除须在 serve 网页确认"),
-    "storage resolve": ("无", "校验旧路径对应的归档位置；不重写报告"),
     "storage apply": ("无", "复核版本计划并 mark；CLI purge 禁用，删除须在 serve 网页确认"),
     "storage explain": ("无", "读取版本保留依据"),
     "storage hold": ("无", "增加对象保护并取消待删除标记"),
     "storage import": ("无", "校验并登记引用清单；只增加保护"),
-    "storage inspect": ("无", "读取版本、保留原因与登记试验"),
+    "storage inspect": ("无", "读取版本与保留原因"),
     "storage plan": ("无", "校验保留依赖并保存版本计划；不删除数据"),
+    "storage raw-external": ("无", "登记外置原文目录；本地保留来源记录，不移动或删除文件"),
     "ths-official backfill": ("执行时", "调用凭证源并补缺"),
     "ths-official capture": ("执行时", "调用凭证源并写对照证据"),
     "ths-official repair-bars": ("执行时", "预演也取数；--apply 写修复"),
