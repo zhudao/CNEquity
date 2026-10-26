@@ -80,12 +80,18 @@ def _gates_on_dataset(cfg, dataset: str, wanted_groups: set[str] | None) -> bool
 
     ``--groups`` names the schedule groups this machine actually runs. A
     dataset nothing schedules still gates: "I cannot tell who fetches this" is
-    not the same claim as "another host fetches it".
+    not the same claim as "another host fetches it". A dataset the config took
+    out of its groups on purpose (``steps_remove``, ``enabled = false``) is the
+    one exception: the operator has said this host does not fetch it.
     """
     if wanted_groups is None:
         return True
     by_group = stale_datasets_by_group(cfg, [dataset])
     owners = {group for group, names in by_group.items() if dataset in names}
+    from cnequity.domain.datasets import removed_from_schedule
+
+    if removed_from_schedule(cfg, dataset):
+        return False
     if not owners:
         return True
     return any(group in wanted_groups or group == "(unscheduled)" for group in owners)
@@ -695,6 +701,13 @@ def _verify_mode(bars: bool, runs: bool, given: dict) -> str:
     ),
 )
 @click.option(
+    "--industry",
+    is_flag=True,
+    help=N_(
+        "Read-only completeness of industry_members by classification system, level and snapshot date; --start/--end narrow it."
+    ),
+)
+@click.option(
     "--bars",
     is_flag=True,
     help=N_(
@@ -753,6 +766,7 @@ def _verify_mode(bars: bool, runs: bool, given: dict) -> str:
 )
 def verify(
     config_path: str,
+    industry: bool,
     bars: bool,
     runs: bool,
     derivatives: bool,
@@ -780,8 +794,25 @@ def verify(
     `--bars` and `--runs` ask the same question at two other grains: "security × session" instead of "dataset × session",
     and "one run per session" instead of rows in the lake.
 
+    \b
+    `--industry` asks it of a classification: each snapshot against the stocks listed that day, and each industry against
+    the previous snapshot, so a classification that silently loses a slice of the market or a whole industry shows.
+
     """
     from cnequity.quality.verify import verify_lake
+
+    if industry:
+        if bars or runs or derivatives or repair or kinds or only or days or as_of or enforce:
+            raise click.UsageError(_("--industry takes only --start and --end"))
+        start_date = parse_date_option(start, "--start") if start else None
+        end_date = parse_date_option(end, "--end") if end else None
+        if start_date and end_date and start_date > end_date:
+            raise click.UsageError(_("--start must be on or before --end"))
+        from cnequity.quality.industry_coverage import industry_coverage_report
+
+        report = industry_coverage_report(_cfg(config_path), start=start_date, end=end_date)
+        click.echo(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        raise SystemExit(1 if report["state"] == "gaps" else 0)
 
     if derivatives:
         if bars or runs or repair or kinds or days or as_of or enforce:
@@ -1088,8 +1119,8 @@ def status(
         from cnequity.domain.datasets import (
             DATASETS,
             empty_freshness_label,
+            freshness_state,
             is_dataset_enabled,
-            is_stale,
         )
         from cnequity.query.reader import list_datasets
 
@@ -1121,7 +1152,8 @@ def status(
             if retired is not None and mark is not None and mark >= retired:
                 return "retired"
             # Per-dataset tolerance (T+1, quarterly …) — inherent lag is not STALE.
-            return "STALE" if is_stale(row["dataset"], mark, anchor, cfg) else "fresh"
+            state = freshness_state(row["dataset"], mark, anchor, cfg)
+            return {"stale": "STALE", "removed": "removed"}.get(state, state)
 
         df = df.with_columns(
             pl_mod.Series("freshness", [_freshness(r) for r in df.iter_rows(named=True)])
@@ -1234,9 +1266,12 @@ def status(
                     else ""
                 )
                 if report.get("unverifiable_exchanges"):
+                    # A limitation of the route, stated beside the result; it does
+                    # not fail the gate (the data on it is not shown to be short).
                     owed_note += _(
-                        "; {exchanges} go through a vendor route (no rows on days without "
-                        "trades) and are outside the proof"
+                        "; limitation, not counted: {exchanges} — vendor route with no rows on "
+                        "days without trades, so it cannot be proven "
+                        '(an official route, [futures].dce_route = "official", can be)'
                     ).format(exchanges=_(", ").join(report["unverifiable_exchanges"]))
                 click.echo(
                     _(
@@ -1579,8 +1614,8 @@ def source_limits(config_path: str):
 @config_option
 @click.option(
     "--vantage",
-    default="local",
-    show_default=True,
+    default=None,
+    show_default="CNE_SOURCE_VANTAGE, else [source_health].vantage, else local",
     help=N_(
         "Where this probe runs from — 'cn', 'overseas', or any label you use. Some sources reject non-mainland egress, so results without this label cannot be interpreted."
     ),
@@ -1616,7 +1651,7 @@ def source_limits(config_path: str):
 )
 def sources_probe(
     config_path: str,
-    vantage: str,
+    vantage: str | None,
     only: str | None,
     out: str | None,
     list_only: bool = False,
@@ -1634,7 +1669,13 @@ def sources_probe(
     and an unauthenticated local service that can reach out to a dozen third parties is not something to leave listening.
 
     """
-    from cnequity.diagnostics.source_health import PROBES, STATUS_LABELS, ProbeStatus, run_probes
+    from cnequity.diagnostics.source_health import (
+        PROBES,
+        STATUS_LABELS,
+        ProbeStatus,
+        effective_vantage,
+        run_probes,
+    )
 
     if list_only:
         for probe in PROBES:
@@ -1644,6 +1685,7 @@ def sources_probe(
     _progress_logging(quiet=True)
     keys = comma_values(only, "--only")
     cfg = _cfg(config_path)
+    vantage = effective_vantage(cfg, vantage)
     try:
         report = run_probes(cfg, vantage=vantage, only=keys, stale_only=stale_only)
     except ValueError as exc:
@@ -1672,8 +1714,8 @@ def sources_probe(
 @config_option
 @click.option(
     "--vantage",
-    default="local",
-    show_default=True,
+    default=None,
+    show_default="CNE_SOURCE_VANTAGE, else [source_health].vantage, else local",
     help=N_("Which egress location (vantage) report to read."),
 )
 @click.option(
@@ -1685,7 +1727,7 @@ def sources_probe(
     ),
 )
 @click.option("--json", "as_json", is_flag=True, help=N_("Output machine-readable JSON."))
-def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bool):
+def sources_substitutes(config_path: str, vantage: str | None, probe: bool, as_json: bool):
     """For each source that is down, who else can answer for its datasets.
 
     \b
@@ -1699,7 +1741,12 @@ def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bo
     """
     import json as json_mod
 
-    from cnequity.diagnostics.source_health import HealthReport, run_probes, validate_vantage
+    from cnequity.diagnostics.source_health import (
+        HealthReport,
+        effective_vantage,
+        run_probes,
+        validate_vantage,
+    )
     from cnequity.diagnostics.substitutes import (
         IGNORED,
         render_substitutions,
@@ -1708,11 +1755,12 @@ def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bo
     )
 
     _progress_logging(quiet=True)
+    cfg = _cfg(config_path)
+    vantage = effective_vantage(cfg, vantage)
     try:
         validate_vantage(vantage)
     except ValueError as exc:
         raise click.BadParameter(str(exc), param_hint="--vantage") from None
-    cfg = _cfg(config_path)
     if probe:
         report = run_probes(cfg, vantage=vantage)
     else:

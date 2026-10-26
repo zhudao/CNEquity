@@ -1118,6 +1118,42 @@ def test_clean_dry_run(cfg_path, monkeypatch):
     assert payload["logical_bytes_selected"] == 120
 
 
+def test_clean_with_changed_references_refuses_without_traceback(cfg_path, tmp_path, caplog):
+    from cnequity.config import load_config
+    from cnequity.storage.lifecycle import LifecycleStore, reference_fingerprint
+
+    cfg = load_config(cfg_path)
+    evidence = tmp_path / "references"
+    evidence.mkdir()
+    roots = [{"path": str(evidence)}]
+    store = LifecycleStore(cfg.meta_root)
+    store.import_manifest(
+        {
+            "schema_version": 1,
+            "meta_root": str(store.meta),
+            "holds": {},
+            "reference_roots": roots,
+            "reference_fingerprint": reference_fingerprint(roots),
+        }
+    )
+    (evidence / "new.json").write_text("{}")
+    registry_before = store.registry_path.read_bytes()
+    staged = cfg.staging_root / "daily_bars/run_id=kept/input.parquet"
+    staged.parent.mkdir(parents=True)
+    staged.write_bytes(b"must survive the refusal")
+
+    result = CliRunner().invoke(cli, ["run", "clean", "--config", cfg_path])
+
+    assert result.exit_code == 1
+    assert "References changed; refresh the lifecycle import before cleanup" in result.output
+    assert "Traceback" not in result.output
+    records = [record for record in caplog.records if record.name == "cnequity.cli"]
+    assert len(records) == 1
+    assert records[0].exc_info is None
+    assert staged.read_bytes() == b"must survive the refusal"
+    assert store.registry_path.read_bytes() == registry_before
+
+
 def test_stats_show_scans_curated_when_no_stats_exist(tmp_path, cfg_path):
     """The former `cne catalog`. A lake that has never run `stats rebuild` must
     still be able to answer what is in it, without a build step first."""
@@ -1226,8 +1262,8 @@ def test_query_rejects_partial_on_demand_options(cfg_path, args):
 
 def test_query_sql(cfg_path, monkeypatch):
     class FakeCon:
-        def execute(self, sql):
-            return SimpleNamespace(pl=lambda: pl.DataFrame({"n": [1]}))
+        def sql(self, sql):
+            return SimpleNamespace(to_arrow_table=lambda: pl.DataFrame({"n": [1]}).to_arrow())
 
         def close(self):
             pass
@@ -1512,13 +1548,9 @@ def test_derive_trading_status_and_orphans(cfg_path, monkeypatch):
     assert summary["run_id"] == seen["run_id"]
     assert "compact" in summary
 
-    monkeypatch.setattr(
-        "cnequity.storage.repairs.valuation_orphans.purge_valuation_orphan_symbols",
-        lambda cfg: {"purged_symbols": 2},
-    )
+    # The one-off target is gone; a valuation_metrics backfill drops orphans itself.
     result = CliRunner().invoke(cli, ["derive", "valuation_orphans", "--config", cfg_path])
-    assert result.exit_code == 0, result.output
-    assert "purged_symbols" in result.output
+    assert result.exit_code != 0
 
 
 def test_derive_trading_status_failure_is_persisted_and_exits_nonzero(cfg_path, monkeypatch):
@@ -1621,19 +1653,21 @@ def test_shfe_annual_plan_is_offline_and_requires_partial_fields(cfg_path, tmp_p
         lambda *_args, **_kwargs: pytest.fail("plan must not import"),
     )
     base = [
-        "backfill",
-        "futures_bars",
-        "--shfe-annual-archive",
+        "import",
+        "shfe-archive",
         str(archive),
-        "--archive-year",
+        "--dataset",
+        "futures_bars",
+        "--year",
         "2026",
         "--config",
         cfg_path,
     ]
-    rejected = CliRunner().invoke(cli, [*base, "--plan"])
+    # A preview by default: the plan, never the import.
+    rejected = CliRunner().invoke(cli, base)
     assert rejected.exit_code != 0
     assert "--accept-partial-fields" in rejected.output
-    planned = CliRunner().invoke(cli, [*base, "--accept-partial-fields", "--plan"])
+    planned = CliRunner().invoke(cli, [*base, "--accept-partial-fields"])
     assert planned.exit_code == 0, planned.output
     assert '"network_requests": 0' in planned.output
     naive = CliRunner().invoke(
@@ -1641,9 +1675,8 @@ def test_shfe_annual_plan_is_offline_and_requires_partial_fields(cfg_path, tmp_p
         [
             *base,
             "--accept-partial-fields",
-            "--archive-downloaded-at",
+            "--downloaded-at",
             "2026-09-27T09:00:00",
-            "--plan",
         ],
     )
     assert naive.exit_code != 0
@@ -1746,13 +1779,10 @@ def test_backfill_trading_status_bj_reports_capability_limit(cfg_path, extra):
 
 
 @pytest.mark.usefixtures("chinese_output")
-def test_backfill_sector_bars_force_and_retry_mutex(cfg_path):
-    result = CliRunner().invoke(
-        cli,
-        ["backfill", "sector_bars", "--config", cfg_path, "--retry-failed", "--force"],
-    )
+def test_backfill_refetch_is_refused_where_it_has_no_meaning(cfg_path):
+    result = CliRunner().invoke(cli, ["backfill", "daily_bars", "--config", cfg_path, "--refetch"])
     assert result.exit_code != 0
-    assert "只能用一个" in result.output
+    assert "--refetch" in result.output
 
 
 def test_backfill_success_compacts(cfg_path, monkeypatch):

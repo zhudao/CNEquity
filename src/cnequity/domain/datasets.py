@@ -450,6 +450,12 @@ class DatasetSpec:
     # must not count them as a fallback. That distinction is why this is its
     # own field rather than another `supplementary_sources` entry.
     repair_sources: tuple[str, ...] = ()
+    # ``(capture source, request-scope prefix, row label)``: a step may derive
+    # rows from one source's exact wire capture and stamp them with a weaker
+    # label so strict PIT excludes them (reconstructed original disclosures).
+    # The raw-archive publish check admits exactly these labels, and only for
+    # captures whose request scope starts with the prefix.
+    reconstructed_sources: tuple[tuple[str, str, str], ...] = ()
     # How far the freshest data may lag the last trading day before it is
     # flagged STALE. For session datasets this is a count of exchange sessions,
     # so a Friday watermark checked on Monday is one day, not three, and a
@@ -793,13 +799,10 @@ _SPECS = [
         supplementary_sources=("derived", "bse"),
         # The independent daily second opinion, and the reason this dataset has
         # a backup at all: both exchanges publish every listed security with its
-        # OHLC and its 证券简称, which carries the halt (open/high/low at zero
-        # beside a reference close) and the ST designation. Measured against the
-        # EastMoney rows for 2026-09-15 over 5,219 symbols: ST agreed on
-        # 100.000%, halts on 99.923%, and every one of the four disagreements
-        # was EastMoney calling a name halted that the exchange had published a
-        # full session for. Shanghai and Shenzhen only — Beijing keeps the BSE
-        # route above.
+        # OHLC and its 证券简称, which carries the halt (Shanghai zeroes
+        # open/high/low beside a reference close; Shenzhen repeats the close
+        # with zero volume) and the ST designation. Shanghai and Shenzhen only —
+        # Beijing keeps the BSE route above.
         backup_source="exchange",
         tier="L0",
         partition_col="trade_date",
@@ -1094,6 +1097,9 @@ _SPECS = [
         # The keyed 同花顺 API is the arbitration peer and fills what the
         # EastMoney datacenter reports omit.
         supplementary_sources=("ths_official",),
+        # `cne repair financial-originals` publishes CNINFO's original-filing
+        # figures; never an automatic route.
+        repair_sources=("cninfo",),
         tier="L3",
         partition_col="report_period",
         partition_granularity="quarter",
@@ -1104,6 +1110,8 @@ _SPECS = [
         # useful for exploratory reads but cannot be advertised as exact PIT.
         pit_quality="reconstructed",
         pit_grade="partial",
+        # Original-date rows rebuilt from a daily capture keep this label.
+        reconstructed_sources=(("eastmoney", "daily:", "eastmoney_backfill"),),
         # Daily ingestion is keyed by NOTICE_DATE while storage is keyed by
         # report period.  Re-read the recent disclosure window so late
         # filings/restatements are captured; the adapter's period backfill
@@ -1291,9 +1299,13 @@ _SPECS = [
         # CNI adjustment history reconstructs 399001/399006 from ~2021-12;
         # CSI indices still accumulate via daily EM snapshots only.
         backfill_source="cni",
+        # `cne repair index-snapshots` replays dated exchange index books.
+        repair_sources=("exchange",),
     ),
     DatasetSpec(
         "industry_members",
+        # v2: level columns; industry_code is the level-3 leaf.
+        schema_version=2,
         primary_source="eastmoney",
         tier="L5",
         partition_col="as_of_date",
@@ -1481,6 +1493,9 @@ _SPECS = [
         # implied step agreed to 3e-6, which is the rounding in Baostock's
         # two-decimal adjusted closes.
         backup_source="baostock",
+        # BJ stocks and LOF/ETF share actions have no vendor factor; the daily
+        # derivation computes them from corporate actions.
+        supplementary_sources=("derived",),
         tier="L1",
         layer="derived",
         partition_col="trade_date",
@@ -1692,6 +1707,36 @@ def _trading_session_lag(mark: date, anchor: date) -> int:
     return lag
 
 
+#: ``max_staleness_days`` at or above this marks a fallback that is not expected daily.
+_SPORADIC_STALENESS = 3650
+
+
+def scheduled_steps(config) -> frozenset[str]:
+    """Every step the config's daily schedule groups run."""
+    groups = getattr(config, "schedule_groups", None) or {}
+    return frozenset(step for group in groups.values() for step in group.steps)
+
+
+def removed_from_schedule(config, dataset: str) -> bool:
+    """Whether the config took *dataset*'s step out of its schedule on purpose.
+
+    ``steps_remove`` or ``enabled = false`` removed it and no other daily group
+    still runs it. Such a dataset is not owed: its last date is real, nothing
+    on this host will move it, and calling it stale every day only teaches the
+    reader to ignore the word. Adding the step back makes it due again.
+    """
+    if config is None or dataset not in (getattr(config, "opted_out_steps", None) or ()):
+        return False
+    return dataset not in scheduled_steps(config)
+
+
+def freshness_state(dataset: str, mark, anchor, config=None) -> str:
+    """``"fresh"``, ``"stale"`` or ``"removed"`` (see `removed_from_schedule`)."""
+    if removed_from_schedule(config, dataset):
+        return "removed"
+    return "stale" if is_stale(dataset, mark, anchor, config) else "fresh"
+
+
 def is_stale(dataset: str, mark, anchor, config=None) -> bool:
     """Whether *dataset*'s freshest date (*mark*) lags *anchor* beyond tolerance.
 
@@ -1712,6 +1757,8 @@ def is_stale(dataset: str, mark, anchor, config=None) -> bool:
     """
     if mark is None or anchor is None:
         return False
+    if removed_from_schedule(config, dataset):
+        return False
     if config is not None:
         from cnequity.storage.observation import freshness_mark
 
@@ -1726,6 +1773,17 @@ def is_stale(dataset: str, mark, anchor, config=None) -> bool:
         if mark >= spec.source_retired_date:
             return False
     tolerance = spec.max_staleness_days if spec else 1
+    if (
+        config is not None
+        and tolerance >= _SPORADIC_STALENESS
+        and dataset in scheduled_steps(config)
+    ):
+        # A fallback table is sporadic only while something else is primary. A
+        # lake that schedules it every day (push2 unavailable, the THS money flow
+        # swapped in with `steps_add`) depends on it each session. It is a
+        # snapshot, so a missed session cannot be fetched later by date: the
+        # last closed session itself is due, as for a live snapshot.
+        return _trading_session_lag(mark, anchor) > 0
     if staleness_counts_trading_sessions(dataset):
         lag = _trading_session_lag(mark, anchor)
     else:

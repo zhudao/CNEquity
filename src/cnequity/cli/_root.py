@@ -29,7 +29,10 @@ LEFTOVER_SECTION = N_("Other")
 
 SECTIONS: list[tuple[str, tuple[str, ...]]] = [
     (N_("Start here"), ("config", "doctor", "init")),
-    (N_("Run the pipeline"), ("run", "backfill", "derive", "repair")),
+    (
+        N_("Run the pipeline"),
+        ("run", "schedule", "backfill", "import", "derive", "repair", "migrate"),
+    ),
     (N_("Check the lake"), ("check", "status", "verify", "audit", "decision-data")),
     (N_("Use the lake"), ("query", "serve", "mcp")),
     (
@@ -274,10 +277,11 @@ def _expected_failure(exc: Exception) -> str | None:
     from cnequity.orchestrator.outcomes import InputUnavailableError
     from cnequity.orchestrator.run_lock import RunLockError
     from cnequity.query.reader import ReaderError
+    from cnequity.storage.lifecycle import LifecycleError
 
     # Another job holding the lake is the lake's state too: `cne backfill`
     # beside a running init printed the refusal under a traceback.
-    if isinstance(exc, ReaderError | InputUnavailableError | RunLockError):
+    if isinstance(exc, ReaderError | InputUnavailableError | RunLockError | LifecycleError):
         return str(exc)
     return None
 
@@ -387,6 +391,12 @@ class SectionedGroup(LocalizedHelpOption, TranslatedHelp, moved_hints(MOVED, bas
     command_class = CneCommand
 
     def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        if ctx.parent is not None:
+            # SECTIONS describe the top level. A subgroup inherits this class,
+            # and sectioning it filed `cne schedule status` under "Check the
+            # lake" beside a root command that merely shares its name.
+            super().format_commands(ctx, formatter)
+            return
         listed = self.list_commands(ctx)
         remaining = set(listed)
         sections: list[tuple[str, list[tuple[str, str]]]] = []
